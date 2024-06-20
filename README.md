@@ -1,4 +1,4 @@
-<h1>Genesis</h1>
+<h1 align=center>Genesis</h1>
 <p align=center>A simple appending ELF virus written in ASM</p>
 
 ## How it should probably work
