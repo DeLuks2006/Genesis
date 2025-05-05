@@ -1,15 +1,14 @@
 src	:= src
 bin	:= bin
-target := infector
+target := Genesis
 asm := $(src)/$(target).asm
 nasm := nasm
-nflags := -f elf64
+aflags := -f elf64
 ld := ld
-debug := -g
 
 all: $(asm)
 	@echo "[#] Assembling file..."
-	$(nasm) $(nflags) $(asm) -o $(target).o
+	$(nasm) $(aflags) $(asm) -o $(target).o
 	@mkdir -p $(bin)
 	@echo "[#] Linking..."
 	$(ld) $(target).o -o $(bin)/$(target)
@@ -17,7 +16,7 @@ all: $(asm)
 
 debug: $(asm)
 	@echo "[#] Assembling file..."
-	$(nasm) $(nflags) $(asm) -o $(target).o $(debug)
+	$(nasm) $(aflags) $(asm) -o $(target).o -g
 	@mkdir -p $(bin)
 	@echo "[#] Linking..."
 	$(ld) $(target).o -o $(bin)/$(target)
