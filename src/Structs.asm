@@ -16,17 +16,10 @@ struc stat
     .padding        resb 0x04
     .st_rdev        resq 0x01
     .st_size        resq 0x01
-    .st_blksize     resq 0x01
-    .st_blocks      resq 0x01
-    .st_atime       resq 0x01
-    .st_atime_nsec  resq 0x01
-    .st_mtime       resq 0x01
-    .st_mtime_nsec  resq 0x01
-    .st_ctime       resq 0x01
-    .st_ctime_nsec  resq 0x01
+    .st_dontcare    resb 0x58
 endstruc
 
-%define STAT_SIZE 16
+%define STAT_SIZE 144
 
 ; this one I did myself!!
 struc elf64_hdr

