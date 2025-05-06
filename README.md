@@ -1,5 +1,5 @@
 <h1 align=center>Genesis</h1>
-<p align=center>A simple appending ELF virus written in ASM</p>
+<p align=center>An ELF Virus Leveraging The PT_NOTE to PT_LOAD Technique.</p>
 
 ## How it should probably work
 1. save old entry point
