@@ -3,7 +3,10 @@
 %define SYS_CLOSE       0x0003
 %define SYS_FSTAT       0x0005
 %define SYS_EXIT        0x003c
+
+%define SYS_TRUNCATE    0x004c
 %define SYS_FTRUNCATE   0x004d
+
 %define SYS_GETDENTS64  0x00d9
 
 %define O_RDONLY        0x0000
@@ -26,6 +29,13 @@
   mov   rdi, %1         ; fd
   mov   rsi, %2         ; len
   mov   rax, SYS_FTRUNCATE
+  syscall
+%endmacro
+
+%macro Truncate 2
+  mov   rdi, %1         ; path
+  mov   rsi, %2         ; len
+  mov   rax, SYS_TRUNCATE
   syscall
 %endmacro
 

