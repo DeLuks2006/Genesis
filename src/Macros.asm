@@ -27,6 +27,7 @@
 %define ELF_MAGIC       0x464c457f
 %define ELF_LENDIAN     0x0001
 %define ELF_64BIT       0x0002
+%define ELF_AMD64       0x002e
 
 ; WRAPPERS >----------------------------------------------------------------<
 
