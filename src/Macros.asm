@@ -24,10 +24,15 @@
 ; MAGIC-NUMBERS >-----------------------------------------------------------<
 
 %define SZ_DENT         0x0200
+
 %define ELF_MAGIC       0x464c457f
 %define ELF_LENDIAN     0x0001
 %define ELF_64BIT       0x0002
-%define ELF_AMD64       0x002e
+%define ELF_AMD64       0x003e
+
+%define PT_LOAD         0x0001
+%define PT_NOTE         0x0004
+%define PT_FLAG_RX      0x0005
 
 ; WRAPPERS >----------------------------------------------------------------<
 

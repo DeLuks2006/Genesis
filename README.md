@@ -3,7 +3,7 @@
 
 This is my first ever virus for 64bit Linux ELF binaries. It infects all 
 64bit ELF binaries in the current directory (non-recursively) using the 
-`PT_NOTE->PTLOAD` technique and displaysa little message as a payload. 
+`PT_NOTE->PT_LOAD` technique and displaysa little message as a payload. 
 All infected binaries are marked with `GNS` in the ELF header padding.
 
 > [!WARNING]
