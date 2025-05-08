@@ -6,7 +6,9 @@
 %define SYS_FSTAT       0x0005
 %define SYS_MMAP        0x0009
 %define SYS_MUNMAP      0x000B
+%define SYS_MSYNC       0x001a
 %define SYS_EXIT        0x003c
+%define SYS_FSYNC       0x004a
 %define SYS_TRUNCATE    0x004c
 %define SYS_FTRUNCATE   0x004d
 %define SYS_GETDENTS64  0x00d9
@@ -20,6 +22,7 @@
 %define PROT_READ       0x0001
 %define PROT_WRITE      0x0002
 %define PROT_READWRITE  0x0003
+%define MS_SYNC         0x0004
 
 ; MAGIC-NUMBERS >-----------------------------------------------------------<
 
@@ -35,6 +38,20 @@
 %define PT_FLAG_RX      0x0005
 
 ; WRAPPERS >----------------------------------------------------------------<
+
+%macro FSync 1
+  mov   rdi,  %1                  ; fd
+  mov   rax,  SYS_FSYNC
+  syscall
+%endmacro
+
+%macro MSync 3
+  mov   rdi,  %1                  ; addr
+  mov   rsi,  %2                  ; len
+  mov   rdx,  %3                  ; flag
+  mov   rax,  SYS_MSYNC
+  syscall
+%endmacro
 
 %macro FStat 2 
   mov   rdi,  %1                  ; 1st arg: fd

