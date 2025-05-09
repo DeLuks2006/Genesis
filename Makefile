@@ -7,22 +7,26 @@ aflags := -f elf64
 ld := ld
 
 all: $(asm)
-	@ echo "[#] Assembling file..."
+	@ echo "[*] Assembling file..."
 	@ $(nasm) $(aflags) $(asm) -o $(target).o
 	@ mkdir -p $(bin)
-	@ echo "[#] Linking..."
+	@ echo "[*] Linking..."
 	@ $(ld) $(target).o -o $(bin)/$(target)
 	@ rm $(target).o
+	@ cp test/target bin/target
+	@ echo "[*] Placed test-binary into bin/ folder."
 
 debug: $(asm)
-	@ echo "[#] Assembling file..."
+	@ echo "[*] Assembling file..."
 	@ $(nasm) $(aflags) $(asm) -o $(target).o -g
 	@ mkdir -p $(bin)
-	@ echo "[#] Linking..."
+	@ echo "[*] Linking..."
 	@ $(ld) $(target).o -o $(bin)/$(target)
 	@ rm $(target).o
+	@ cp test/target bin/target
+	@ echo "[*] Placed test-binary into bin/ folder."
 
 clean:
-	@ echo "[#] Cleaning up..."
+	@ echo "[*] Cleaning up..."
 	@ rm -rf bin/
 

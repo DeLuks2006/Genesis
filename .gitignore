@@ -1,6 +1,5 @@
 bin/*
 bin/target.elf
 Genesis
-target.elf
 *.elf
 *.o

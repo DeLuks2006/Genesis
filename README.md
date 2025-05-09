@@ -31,11 +31,28 @@ The resulting binary will be created in `bin/`.
 
 \< demo-video placeholder \>
 
+## Project Structure:
+
+The project is structured in the following way:
+
+```txt
+.
+├── Makefile
+├── README.md       <-- You are here :)
+├── src
+│   ├── Genesis.asm <-- The actual Virus Source
+│   ├── Macros.asm  <-- Helper Macros
+│   └── Structs.asm <-- Struct definitions
+└── test
+    └── target      <-- 'Hello World' Bin for Testing Purposes
+```
+
 ## Possible Improvements:
 
 Due to the virus being a quick little side project, I made it pretty stupid so
 there is a lot to improve. For one, the payload, or the whole virus, could be 
 encrypted and then decrypted at runtime. One could also find a better way to 
-watermark the infected files instead of overwriting the ELF header padding 
-and finally instead of overwriting the `e_entry` value, one could patch 
+watermark the infected files instead of overwriting the ELF header padding.
+Additionally the file-enumeration logic could be rewritten to recurse into 
+directories. Finally instead of overwriting the `e_entry` value, one could patch 
 `cxa_finalize`.
