@@ -1,6 +1,7 @@
 ; SYSCALLS >----------------------------------------------------------------<
 
 %define SYS_READ        0x0000
+%define SYS_WRITE       0x0001
 %define SYS_OPEN        0x0002
 %define SYS_CLOSE       0x0003
 %define SYS_FSTAT       0x0005
@@ -37,7 +38,17 @@
 %define PT_NOTE         0x0004
 %define PT_FLAG_RX      0x0005
 
+%define STDOUT          0x0001
+
 ; WRAPPERS >----------------------------------------------------------------<
+
+%macro Write 3
+  mov   rdi,  %1          ; fd
+  lea   rsi,  %2          ; msg
+  mov   rdx,  %3          ; len
+  mov   rax,  SYS_WRITE
+  syscall
+%endmacro
 
 %macro FSync 1
   mov   rdi,  %1                  ; fd

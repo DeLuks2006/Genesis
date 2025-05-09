@@ -31,3 +31,11 @@ The resulting binary will be created in `bin/`.
 
 \< demo-video placeholder \>
 
+## Possible Improvements:
+
+Due to the virus being a quick little side project, I made it pretty stupid so
+there is a lot to improve. For one, the payload, or the whole virus, could be 
+encrypted and then decrypted at runtime. One could also find a better way to 
+watermark the infected files instead of overwriting the ELF header padding 
+and finally instead of overwriting the `e_entry` value, one could patch 
+`cxa_finalize`.
