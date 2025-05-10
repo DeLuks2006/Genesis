@@ -13,7 +13,7 @@ all: $(asm)
 	@ echo "[*] Linking..."
 	@ $(ld) $(target).o -o $(bin)/$(target)
 	@ rm $(target).o
-	@ cp test/target bin/target
+	@ cp test/target_exec bin/target
 	@ echo "[*] Placed test-binary into bin/ folder."
 
 debug: $(asm)
@@ -23,7 +23,7 @@ debug: $(asm)
 	@ echo "[*] Linking..."
 	@ $(ld) $(target).o -o $(bin)/$(target)
 	@ rm $(target).o
-	@ cp test/target bin/target
+	@ cp test/target_exec bin/target
 	@ echo "[*] Placed test-binary into bin/ folder."
 
 clean:

