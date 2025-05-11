@@ -51,7 +51,7 @@
 
 %macro Write 3
   mov   rdi,  %1          ; fd
-  lea   rsi,  %2          ; msg
+  mov   rsi,  %2          ; msg
   mov   rdx,  %3          ; len
   mov   rax,  SYS_WRITE
   syscall

