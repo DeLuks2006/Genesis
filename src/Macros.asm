@@ -27,7 +27,7 @@
 
 ; MAGIC-NUMBERS >-----------------------------------------------------------<
 
-%define SZ_DENT         0x0200
+%define SZ_DENT         0x0400
 %define SZ_JMP_OEP      0x000C
 
 %define ELF_MAGIC       0x464c457f

