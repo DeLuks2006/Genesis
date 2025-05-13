@@ -147,10 +147,13 @@
 %endmacro
 
 %macro PushAll 0
+  push  rdx
   push  rdi
   push  rbx
   push  rsi
   push  rbp
+  push  r12
+  push  r13
   push  r14
   push  r15
 %endmacro
@@ -158,8 +161,11 @@
 %macro PopAll 0
   pop   r15
   pop   r14
+  pop   r13
+  pop   r12
   pop   rbp
   pop   rsi
   pop   rbx
   pop   rdi
+  pop   rdx
 %endmacro
