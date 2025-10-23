@@ -2,6 +2,7 @@
 ;@;                                                           genesis.asm ;@;
 ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
+; assemble
 ; nasm -f elf64 genesis.asm -o genesis.o
 ; ld genesis.o -o genesis
 
