@@ -7,7 +7,7 @@ This is my first ever virus for 64bit Linux ELF binaries. It infects all
 All infected binaries are marked with `GNS` in the ELF header padding.
 
 > [!WARNING]
-> Even though it doesn't have a desctructive payload, this is (obviously) 
+> Even though it doesn't have a destructive payload, this is (obviously) 
 > a destructive binary, run at your own risk. I am not in any way, shape 
 > or form responsible for the damages you cause with this.
 >
