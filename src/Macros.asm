@@ -1,18 +1,19 @@
 ; SYSCALLS >----------------------------------------------------------------<
 
-%define SYS_READ        0x0000
-%define SYS_WRITE       0x0001
-%define SYS_OPEN        0x0002
-%define SYS_CLOSE       0x0003
-%define SYS_FSTAT       0x0005
-%define SYS_MMAP        0x0009
-%define SYS_MUNMAP      0x000B
-%define SYS_MSYNC       0x001a
-%define SYS_EXIT        0x003c
-%define SYS_FSYNC       0x004a
-%define SYS_TRUNCATE    0x004c
-%define SYS_FTRUNCATE   0x004d
-%define SYS_GETDENTS64  0x00d9
+%define SYS_READ            0x0000
+%define SYS_WRITE           0x0001
+%define SYS_OPEN            0x0002
+%define SYS_CLOSE           0x0003
+%define SYS_FSTAT           0x0005
+%define SYS_MMAP            0x0009
+%define SYS_MUNMAP          0x000B
+%define SYS_MSYNC           0x001a
+%define SYS_EXIT            0x003c
+%define SYS_FSYNC           0x004a
+%define SYS_TRUNCATE        0x004c
+%define SYS_FTRUNCATE       0x004d
+%define SYS_GETDENTS64      0x00d9
+%define SYS_CLOCK_GET_TIME  0x00e4
 
 ; FLAGS >-------------------------------------------------------------------<
 
@@ -155,6 +156,13 @@
   mov   rdi,  %1                  ; region
   mov   rsi,  %2                  ; size
   mov   rax,  SYS_MUNMAP
+  syscall
+%endmacro
+
+%macro ClockGetTime 1
+  xor   edi,  edi
+  lea   rsi,  %1
+  mov   eax,  SYS_CLOCK_GET_TIME
   syscall
 %endmacro
 
