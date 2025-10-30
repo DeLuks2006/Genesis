@@ -1,18 +1,19 @@
 ; SYSCALLS >----------------------------------------------------------------<
 
-%define SYS_READ        0x0000
-%define SYS_WRITE       0x0001
-%define SYS_OPEN        0x0002
-%define SYS_CLOSE       0x0003
-%define SYS_FSTAT       0x0005
-%define SYS_MMAP        0x0009
-%define SYS_MUNMAP      0x000B
-%define SYS_MSYNC       0x001a
-%define SYS_EXIT        0x003c
-%define SYS_FSYNC       0x004a
-%define SYS_TRUNCATE    0x004c
-%define SYS_FTRUNCATE   0x004d
-%define SYS_GETDENTS64  0x00d9
+%define SYS_READ            0x0000
+%define SYS_WRITE           0x0001
+%define SYS_OPEN            0x0002
+%define SYS_CLOSE           0x0003
+%define SYS_FSTAT           0x0005
+%define SYS_MMAP            0x0009
+%define SYS_MUNMAP          0x000B
+%define SYS_MSYNC           0x001a
+%define SYS_EXIT            0x003c
+%define SYS_FSYNC           0x004a
+%define SYS_TRUNCATE        0x004c
+%define SYS_FTRUNCATE       0x004d
+%define SYS_GETDENTS64      0x00d9
+%define SYS_CLOCK_GET_TIME  0x00e4
 
 ; FLAGS >-------------------------------------------------------------------<
 
@@ -25,10 +26,21 @@
 %define PROT_READWRITE  0x0003
 %define MS_SYNC         0x0004
 
+; MSG >---------------------------------------------------------------------<
+%macro MSG_PLACEHOLDER 0
+.msg:
+  db "  ▄████████▄ ▄████████▄ ███▄  ███▄ ▄████████▄ ▄████████▄ ▄████████▄ ▄████████▄", 0x0a
+  db "  ████████▓█ ████████▓█ ████▄ ██▓█ ████████▓█ ████████▓█ ████████▓█ ████████▓█", 0x0a
+  db "  ████▀ ▄▄▄  ████ █████ ██████████ ████ █████ ▀█████ ▀▀▀  ▀▀▀▀▀▀▀▀  ▀█████ ▀▀▀", 0x0a
+  db "  ████ ███▓█ ██████████ ████ ▀████ ██████████  ▄▄▄ ████▄  ▄██████▄   ▄▄▄ ████▄", 0x0a
+  db "  ████ ▀████ ████▄▄▄▄▄  ████  ████ ████▄▄▄▄▄  ████▄███▓█ ████████▓█ ████▄███▓█", 0x0a
+  db "  ▀████████▀ ▀█████████ ▀███  ▀███ ▀█████████ ▀████████▀ ▀████████▀ ▀████████▀", 0x0a, 0x00
+%endmacro
+
 ; MAGIC-NUMBERS >-----------------------------------------------------------<
 
 %define SZ_DENT         0x0400
-%define SZ_JMP_OEP      0x000C
+%define SZ_JMP_OEP      26; 0x000C
 
 %define ELF_MAGIC       0x464c457f
 %define ELF_LENDIAN     0x0001
@@ -40,6 +52,11 @@
 %define PT_FLAG_RX      0x0005
 
 %define STDOUT          0x0001
+
+%define LOGOLEN 474
+%define RED  0x6d31335b1b
+%define RST  0x6d30335b1b
+%define CLR  0x000000631b
 
 ; WRAPPERS >----------------------------------------------------------------<
 
@@ -139,6 +156,13 @@
   mov   rdi,  %1                  ; region
   mov   rsi,  %2                  ; size
   mov   rax,  SYS_MUNMAP
+  syscall
+%endmacro
+
+%macro ClockGetTime 1
+  xor   edi,  edi
+  lea   rsi,  %1
+  mov   eax,  SYS_CLOCK_GET_TIME
   syscall
 %endmacro
 
